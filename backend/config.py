@@ -23,17 +23,16 @@ class PostgresConfig(BaseSettings):
     password: str
     db: str
 
-    def get_db_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.user}:{self.password}@"
-            f"{self.host}:{self.port}/{self.db}"
-        )
+
+class RedisConfig(BaseSettings):
+    model_config = SettingsConfigDict(**_BASE_KWARGS, env_prefix="REDIS_")
+    host: str
+    port: int
+    password: str
+    session_ttl_seconds: int
 
 
 class Config:
     def __init__(self) -> None:
         self.postgres = PostgresConfig()
-
-
-config = Config()
-print(config.postgres.get_db_url())
+        self.redis = RedisConfig()

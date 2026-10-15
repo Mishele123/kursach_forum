@@ -9,10 +9,13 @@ services:
     env_file:
       - .env
     environment:
+      UPLOAD_DIR: /app/uploads
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    volumes:
+      - uploads_data:/app/uploads
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -67,6 +70,7 @@ services:
         - app_network
 
 volumes:
+  uploads_data:
   postgres_data:
   redis_data:
 

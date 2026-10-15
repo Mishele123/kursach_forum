@@ -2,7 +2,9 @@ import base64
 import binascii
 from datetime import datetime
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
+from community.media import MAX_UPLOAD_BYTES, save_photo
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.current_user import current_user
@@ -16,7 +18,8 @@ router = APIRouter(prefix='/posts', tags=['Posts'], route_class=DishkaRoute)
 
 def post_response(post: Post, author: UserModel) -> PostResponse:
     return PostResponse(id=post.id, author=AuthorResponse(id=author.id, username=author.username),
-                        title=post.title, text=post.text, category=post.category, created_at=post.created_at)
+                        title=post.title, text=post.text, category=post.category, created_at=post.created_at,
+                        photo_url=f"/media/{post.photo_filename}" if post.photo_filename else None)
 
 
 @router.post('', status_code=201)
@@ -61,3 +64,30 @@ async def get_post(post_id: int, db: FromDishka[AsyncSession]) -> PostResponse:
     if row is None:
         raise HTTPException(404, 'Пост не найден')
     return post_response(*row)
+
+
+@router.put('/{post_id}/photo')
+async def upload_photo(post_id: int, request: Request, db: FromDishka[AsyncSession],
+                       sessions: FromDishka[RedisCache], file: UploadFile) -> PostResponse:
+    user = await current_user(request, db, sessions)
+    post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise HTTPException(404, 'Пост не найден')
+    if post.author_id != user.id:
+        raise HTTPException(403, 'Изменять фотографию может только автор')
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, 'Максимальный размер фотографии — 5 МБ')
+    directory = request.app.state.upload_dir
+    filename = await run_in_threadpool(save_photo, data, directory)
+    previous = post.photo_filename
+    try:
+        post.photo_filename = filename
+        result = post_response(post, user)
+        await db.commit()
+    except BaseException:
+        (directory / filename).unlink(missing_ok=True)
+        raise
+    if previous:
+        (directory / previous).unlink(missing_ok=True)
+    return result

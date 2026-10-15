@@ -15,4 +15,5 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(200))
     text: Mapped[str] = mapped_column(String(10000))
     category: Mapped[str] = mapped_column(String(20))
+    photo_filename: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

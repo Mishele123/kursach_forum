@@ -25,6 +25,7 @@ class PostResponse(BaseModel):
     title: str
     text: str
     category: Category
+    photo_url: str | None
     created_at: datetime
 
 

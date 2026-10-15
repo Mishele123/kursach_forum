@@ -49,3 +49,23 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get('/posts', params={'limit': 0})).status_code, 422)
         self.assertEqual((await self.client.get(f'/posts/{ids[0]}')).status_code, 200)
         self.assertEqual((await self.client.get('/posts/2147483647')).status_code, 404)
+
+    async def test_photo_upload(self):
+        from io import BytesIO
+        from PIL import Image
+        await self.account()
+        post = (await self.client.post('/posts', json={'title': 'Фото', 'text': 'Велосипед', 'category': 'upgrade'})).json()
+        url = f"/posts/{post['id']}/photo"
+        self.assertIsNone(post['photo_url'])
+        self.assertEqual((await self.client.put(url, files={'file': ('bad.jpg', b'not an image', 'image/jpeg')})).status_code, 415)
+        self.assertEqual((await self.client.put(url, files={'file': ('big.jpg', b'x' * (5 * 1024 * 1024 + 1))})).status_code, 413)
+        image = BytesIO(); Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        response = await self.client.put(url, files={'file': ('photo.png', image.getvalue(), 'image/png')})
+        self.assertEqual(response.status_code, 200, response.text)
+        first = response.json()['photo_url']
+        self.assertEqual((await self.client.get(first)).status_code, 200)
+        second = await self.client.put(url, files={'file': ('photo.png', image.getvalue(), 'image/png')})
+        self.assertNotEqual(first, second.json()['photo_url'])
+        self.assertEqual((await self.client.get(first)).status_code, 404)
+        await self.account()
+        self.assertEqual((await self.client.put(url, files={'file': ('photo.png', image.getvalue())})).status_code, 403)

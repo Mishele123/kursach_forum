@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from community.routes import router as posts_router
 from auth.controllers import auth_router, register_exception_handlers
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     app: FastAPI = FastAPI(lifespan=lifespan)
     register_exception_handlers(app)
     app.include_router(auth_router)
+    app.include_router(posts_router)
     setup_dishka(container, app)
     return app
 

@@ -2,6 +2,7 @@ import asyncio
 from logging.config import fileConfig
 
 import alembic_postgresql_enum
+import community.models
 import auth.models  # noqa: F401 — чтобы все модели попали в metadata
 from alembic import context
 from config import Config

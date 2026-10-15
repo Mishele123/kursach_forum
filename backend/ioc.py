@@ -27,10 +27,14 @@ class ConfigProvider(Provider):
 
 class PostgresProvider(Provider):
     @provide(scope=Scope.APP)
-    def get_session_maker(
+    async def get_session_maker(
         self, config: PostgresConfig
-    ) -> async_sessionmaker[AsyncSession]:
-        return new_session_maker(config)
+    ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+        maker = new_session_maker(config)
+        try:
+            yield maker
+        finally:
+            await maker.kw["bind"].dispose()
 
     @provide(scope=Scope.REQUEST)
     async def get_session(
@@ -50,7 +54,7 @@ class RedisProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_redis_cache(self, client: redis.Redis, config: RedisConfig) -> RedisCache:
-        return RedisCache(client, config.session_ttl_seconds)
+        return RedisCache(client, config.session_ttl_seconds, prefix=config.key_prefix)
 
 
 class RepoProvider(Provider):

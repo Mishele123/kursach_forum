@@ -29,6 +29,7 @@ class RedisConfig(BaseSettings):
     host: str
     port: int
     password: str
+    key_prefix: str = ""
     session_ttl_seconds: int
 
 

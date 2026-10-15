@@ -17,3 +17,13 @@ class Post(Base):
     category: Mapped[str] = mapped_column(String(20))
     photo_filename: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Bike(Base):
+    __tablename__ = 'bikes'
+    __table_args__ = (CheckConstraint('year >= 1800 AND year <= 2200', name='ck_bikes_year'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    brand: Mapped[str] = mapped_column(String(100))
+    model: Mapped[str] = mapped_column(String(100))
+    year: Mapped[int]

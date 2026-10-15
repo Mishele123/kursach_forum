@@ -93,3 +93,47 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get('/auth/me')).status_code, 401)
         self.client.cookies.set('session_id', cookie)
         self.assertEqual((await self.client.get('/auth/me')).status_code, 401)
+
+    async def test_bikes_owned_by_current_user(self):
+        bike = {'brand': 'Trek', 'model': 'Marlin', 'year': 2024}
+        self.assertEqual((await self.client.post('/users/me/bikes', json=bike)).status_code, 401)
+        await self.account()
+        response = await self.client.post('/users/me/bikes', json=bike)
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual((await self.client.get('/users/me/bikes')).json(), [response.json()])
+        self.assertEqual((await self.client.post('/users/me/bikes', json={**bike, 'year': 2199})).status_code, 422)
+        self.assertEqual((await self.client.post('/users/me/bikes', json={**bike, 'owner_id': 1})).status_code, 422)
+        await self.account()
+        self.assertEqual((await self.client.get('/users/me/bikes')).json(), [])
+
+    async def test_deleted_banned_and_expired_sessions(self):
+        from datetime import datetime, timezone, timedelta
+        from config import Config
+        from shared import new_session_maker
+        from auth.models import UserModel
+        from auth.infra import new_redis_client
+        from sqlalchemy import select
+        dto = await self.account()
+        config = Config()
+        maker = new_session_maker(config.postgres)
+        try:
+            async with maker() as db:
+                user = await db.scalar(select(UserModel).where(UserModel.email == dto['email']))
+                user.banned_until = datetime.now(timezone.utc) + timedelta(days=1)
+                await db.commit()
+            self.assertEqual((await self.client.get('/auth/me')).status_code, 403)
+            async with maker() as db:
+                user = await db.scalar(select(UserModel).where(UserModel.email == dto['email']))
+                user.banned_until = None
+                user.deleted_at = datetime.now(timezone.utc)
+                await db.commit()
+            self.assertEqual((await self.client.get('/auth/me')).status_code, 401)
+            await self.account()
+            client = new_redis_client(config.redis)
+            try:
+                await client.delete(f'{config.redis.key_prefix}:session:{self.client.cookies.get("session_id")}')
+                self.assertEqual((await self.client.get('/auth/me')).status_code, 401)
+            finally:
+                await client.aclose()
+        finally:
+            await maker.kw['bind'].dispose()

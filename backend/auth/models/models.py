@@ -2,9 +2,9 @@ import enum
 from datetime import datetime
 
 from shared import Base
-from sqlalchemy import DateTime, ForeignKey, func
+from sqlalchemy import DateTime, ForeignKey, func, String
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -32,6 +32,9 @@ class UserModel(Base):
         server_default=UserRole.USER.value,
     )
     avatar_url: Mapped[str | None]
+    city: Mapped[str | None] = mapped_column(String(100))
+    discipline: Mapped[str | None] = mapped_column(String(100))
+    interests: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
     bio: Mapped[str | None]
     banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ban_reason: Mapped[str | None]

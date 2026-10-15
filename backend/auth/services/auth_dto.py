@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, EmailStr, ConfigDict
 
 Username = Annotated[
     str,
@@ -13,10 +13,12 @@ Username = Annotated[
     ),
 ]
 
-Password = Annotated[str, StringConstraints(min_length=8, max_length=20)]
+Password = Annotated[str, StringConstraints(min_length=8, max_length=128)]
 
 
 class UserRequestCreateDto(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: EmailStr
     username: Username
     password: Password
 
@@ -26,7 +28,8 @@ class UserResponceCreateDto(BaseModel):
 
 
 class UserRequestLoginDto(BaseModel):
-    username: Username
+    model_config = ConfigDict(extra="forbid")
+    email: EmailStr
     password: Password
     remember_me: bool = False
 

@@ -1,6 +1,9 @@
 import secrets
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
+from starlette.concurrency import run_in_threadpool
+from sqlalchemy.exc import IntegrityError
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
 
@@ -37,16 +40,19 @@ class CreateUserInteractor:
         self._password_hasher = password_hasher
 
     async def __call__(self, dto: UserRequestCreateDto) -> UserResponceCreateDto:
-        print("create", flush=True)
         existing: UserModel | None = await self._db.read_by_username(dto.username)
         if existing:
             raise UsernameAlreadyExists(dto.username)
-        password_hash: str = self._password_hasher.hash(dto.password)
+        if await self._db.read_by_email(str(dto.email)):
+            raise HTTPException(409, "Email уже используется")
+        password_hash: str = await run_in_threadpool(self._password_hasher.hash, dto.password)
 
-        user: UserModel = await self._db.create(
-            UserModel(username=dto.username, password_hash=password_hash)
-        )
-        print(user)
+        try:
+            user: UserModel = await self._db.create(
+                UserModel(username=dto.username, email=str(dto.email), password_hash=password_hash)
+            )
+        except IntegrityError:
+            raise HTTPException(409, "Имя или email уже используется")
         return UserResponceCreateDto(username=user.username)
 
 
@@ -61,19 +67,19 @@ class LoginUserInteractor:
     async def __call__(
         self, dto: UserRequestLoginDto, user_agent: str
     ) -> UserResponceLoginDto:
-        user: UserModel | None = await self._db.read_by_username(dto.username)
-        if user is None:
-            raise UserNotFound(dto.username)
+        user: UserModel | None = await self._db.read_by_email(str(dto.email))
+        if user is None or user.password_hash is None:
+            raise WrongPassword()
         if user.deleted_at is not None:
             raise UserDeleted(user.deleted_at)
         if is_user_banned(user):
             raise UserBanned(user.username, user.banned_until, user.ban_reason)
         try:
-            self._password_hasher.verify(user.password_hash, dto.password)
+            await run_in_threadpool(self._password_hasher.verify, user.password_hash, dto.password)
         except (VerifyMismatchError, VerificationError):
             raise WrongPassword()
         if self._password_hasher.check_needs_rehash(user.password_hash):
-            new_hash = self._password_hasher.hash(dto.password)
+            new_hash = await run_in_threadpool(self._password_hasher.hash, dto.password)
             await self._db.update(user.id, password_hash=new_hash)
 
         session_id: str = secrets.token_urlsafe(32)

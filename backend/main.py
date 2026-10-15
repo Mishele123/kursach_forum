@@ -4,6 +4,7 @@ from starlette.staticfiles import StaticFiles
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from community.profile import router as profile_router
 from community.routes import router as posts_router
 from auth.controllers import auth_router, register_exception_handlers
 from dishka import AsyncContainer, make_async_container
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(auth_router)
     app.include_router(posts_router)
+    app.include_router(profile_router)
     setup_dishka(container, app)
     return app
 

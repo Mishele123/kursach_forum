@@ -24,9 +24,9 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def account(self):
         username = 'user_' + secrets.token_hex(5)
-        dto = {'username': username, 'password': 'GoodPassword123'}
+        dto = {'username': username, 'email': username + '@example.com', 'password': 'GoodPassword123'}
         self.assertEqual((await self.client.post('/auth/register', json=dto)).status_code, 201)
-        self.assertEqual((await self.client.post('/auth/login', json=dto)).status_code, 200)
+        self.assertEqual((await self.client.post('/auth/login', json={k: dto[k] for k in ('email', 'password')})).status_code, 200)
         return dto
 
     async def test_posts_and_feed(self):
@@ -69,3 +69,27 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get(first)).status_code, 404)
         await self.account()
         self.assertEqual((await self.client.put(url, files={'file': ('photo.png', image.getvalue())})).status_code, 403)
+
+    async def test_email_profile_logout(self):
+        dto = await self.account()
+        self.assertEqual((await self.client.post('/auth/register', json={**dto, 'username': 'other_name'})).status_code, 409)
+        self.assertEqual((await self.client.post('/auth/register', json={**dto, 'email': 'bad'})).status_code, 422)
+        self.assertEqual((await self.client.post('/auth/login', json={'email': dto['email'], 'password': 'WrongPassword'})).status_code, 401)
+        self.assertEqual((await self.client.post('/auth/login', json={'email': dto['email'].upper(), 'password': dto['password']})).status_code, 200)
+        cookie = self.client.cookies.get('session_id')
+        self.assertTrue(cookie)
+        profile = {'city': 'Самара', 'discipline': 'MTB', 'interests': ['маршруты', 'ремонт']}
+        response = await self.client.patch('/users/me', json=profile)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['city'], 'Самара')
+        self.assertNotIn('password_hash', response.json())
+        await self.client.patch('/users/me', json={'bio': 'Люблю велосипеды'})
+        self.assertEqual((await self.client.get('/auth/me')).json()['city'], 'Самара')
+        self.assertEqual((await self.client.patch('/users/me', json={'role': 'admin'})).status_code, 422)
+        await self.account()
+        self.assertIsNone((await self.client.get('/users/me')).json()['city'])
+        cookie = self.client.cookies.get('session_id')
+        self.assertEqual((await self.client.post('/auth/logout')).status_code, 204)
+        self.assertEqual((await self.client.get('/auth/me')).status_code, 401)
+        self.client.cookies.set('session_id', cookie)
+        self.assertEqual((await self.client.get('/auth/me')).status_code, 401)

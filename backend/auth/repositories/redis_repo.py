@@ -130,7 +130,7 @@ class RedisCache:
         }
 
         async with self._session.pipeline(transaction=True) as pipe:
-            pipe.setex(session_key, ttl, json.dumps(session_data, ensure_ascii=False))
+            pipe.set(session_key, json.dumps(session_data, ensure_ascii=False), ex=ttl)
             pipe.sadd(user_sessions_key, session_id)
             pipe.expire(user_sessions_key, self._session_ttl_seconds)
             pipe.zadd(
@@ -361,7 +361,7 @@ class RedisCache:
         expiry_key = self._get_sessions_expiry_key()
 
         async with self._session.pipeline(transaction=True) as pipe:
-            pipe.setex(session_key, ttl, json.dumps(session_dict, ensure_ascii=False))
+            pipe.set(session_key, json.dumps(session_dict, ensure_ascii=False), ex=ttl)
             pipe.zadd(
                 expiry_key,
                 {

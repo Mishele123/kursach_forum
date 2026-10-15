@@ -52,7 +52,7 @@ async def login(
         key="session_id",
         value=result.session_id,
         httponly=True,
-        secure=False,
+        secure=request.app.state.web_config.cookie_secure,
         samesite="lax",
         max_age=result.max_age if dto.remember_me else None,
         path="/",

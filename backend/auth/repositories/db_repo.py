@@ -29,9 +29,10 @@ class UserRepo:
         return await self._session.scalar(stmt)
 
     async def create(self, user: UserModel) -> UserModel:
-        self._session.add(user)
-        await self._session.flush()
-        await self._session.refresh(user)
+        async with self._session.begin_nested():
+            self._session.add(user)
+            await self._session.flush()
+            await self._session.refresh(user)
         return user
 
     async def update(self, id: int, **kwargs) -> bool:

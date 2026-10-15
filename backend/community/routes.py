@@ -1,8 +1,9 @@
 import base64
 import binascii
 from datetime import datetime
+from typing import Annotated
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, Path
 from starlette.concurrency import run_in_threadpool
 from community.media import MAX_UPLOAD_BYTES, save_photo
 from sqlalchemy import select, tuple_
@@ -12,6 +13,8 @@ from auth.models import UserModel
 from auth.repositories import RedisCache
 from community.models import Post
 from community.schemas import AuthorResponse, FeedResponse, PostCreate, PostResponse
+
+PostId = Annotated[int, Path(ge=1, le=2147483647)]
 
 router = APIRouter(prefix='/posts', tags=['Posts'], route_class=DishkaRoute)
 
@@ -58,7 +61,7 @@ async def feed(db: FromDishka[AsyncSession], limit: int = Query(20, ge=1, le=100
 
 
 @router.get('/{post_id}')
-async def get_post(post_id: int, db: FromDishka[AsyncSession]) -> PostResponse:
+async def get_post(post_id: PostId, db: FromDishka[AsyncSession]) -> PostResponse:
     row = (await db.execute(select(Post, UserModel).join(UserModel, Post.author_id == UserModel.id)
                            .where(Post.id == post_id, UserModel.deleted_at.is_(None)))).first()
     if row is None:
@@ -67,7 +70,7 @@ async def get_post(post_id: int, db: FromDishka[AsyncSession]) -> PostResponse:
 
 
 @router.put('/{post_id}/photo')
-async def upload_photo(post_id: int, request: Request, db: FromDishka[AsyncSession],
+async def upload_photo(post_id: PostId, request: Request, db: FromDishka[AsyncSession],
                        sessions: FromDishka[RedisCache], file: UploadFile) -> PostResponse:
     user = await current_user(request, db, sessions)
     post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())

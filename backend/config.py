@@ -37,3 +37,9 @@ class Config:
     def __init__(self) -> None:
         self.postgres = PostgresConfig()
         self.redis = RedisConfig()
+
+
+class WebConfig(BaseSettings):
+    model_config = SettingsConfigDict(**_BASE_KWARGS, env_prefix='WEB_')
+    allowed_origins: list[str] = ['http://localhost:5173', 'http://127.0.0.1:5173']
+    cookie_secure: bool = False

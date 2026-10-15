@@ -137,3 +137,29 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
                 await client.aclose()
         finally:
             await maker.kw['bind'].dispose()
+
+    async def test_browser_origins_and_invalid_identifiers(self):
+        preflight = await self.client.options('/posts', headers={
+            'Origin': 'http://localhost:5173', 'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'content-type'})
+        self.assertEqual(preflight.status_code, 200)
+        self.assertEqual(preflight.headers['access-control-allow-origin'], 'http://localhost:5173')
+        self.assertEqual(preflight.headers['access-control-allow-credentials'], 'true')
+        response = await self.client.post('/auth/logout', headers={'Origin': 'https://untrusted.example'})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual((await self.client.get('/posts/999999999999999999999')).status_code, 422)
+        self.assertEqual((await self.client.get('/posts/-1')).status_code, 422)
+
+    async def test_registration_race_and_cookie(self):
+        import asyncio
+        username = 'race_' + secrets.token_hex(5)
+        payload = {'username': username, 'email': username + '@example.com', 'password': 'GoodPassword123'}
+        results = await asyncio.gather(*[self.client.post('/auth/register', json=payload) for _ in range(2)])
+        self.assertEqual(sorted(r.status_code for r in results), [201, 409])
+        response = await self.client.post('/auth/login', json={'email': payload['email'], 'password': payload['password'], 'remember_me': True})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('session_id', response.json())
+        cookie = response.headers['set-cookie']
+        self.assertIn('HttpOnly', cookie)
+        self.assertIn('Max-Age=', cookie)
+        self.assertIn('SameSite=lax', cookie)

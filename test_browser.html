@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Backend API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .card a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+        .card a:hover {
+            background: #5568d3;
+        }
+        .endpoints {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .endpoint {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+        .post { background: #49cc90; color: white; }
+        .get { background: #61affe; color: white; }
+        .put { background: #fca130; color: white; }
+        .delete { background: #f93e3e; color: white; }
+        code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚴 Cycling Social Network API</h1>
+        <p>Backend API Testing Interface - Sprint 1</p>
+    </div>
+
+    <div class="status">
+        ✅ Server đang chạy tại: <strong>http://localhost:8000</strong>
+    </div>
+
+    <div class="links">
+        <div class="card">
+            <h3>📚 Swagger UI</h3>
+            <p>Giao diện tương tác để test API. Bạn có thể thử tất cả các endpoints ngay trong trình duyệt.</p>
+            <a href="http://localhost:8000/docs" target="_blank">Mở Swagger UI</a>
+        </div>
+
+        <div class="card">
+            <h3>📖 ReDoc</h3>
+            <p>Tài liệu API với giao diện đẹp và dễ đọc hơn.</p>
+            <a href="http://localhost:8000/redoc" target="_blank">Mở ReDoc</a>
+        </div>
+
+        <div class="card">
+            <h3>🏠 API Root</h3>
+            <p>Trang chủ API với thông tin tổng quan và danh sách endpoints.</p>
+            <a href="http://localhost:8000/" target="_blank">Mở Root</a>
+        </div>
+    </div>
+
+    <div class="endpoints">
+        <h2>📍 Available Endpoints</h2>
+        
+        <h3>👤 Authentication & Profile (US1, US2)</h3>
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/auth/register</code>
+            <p>Đăng ký tài khoản mới</p>
+        </div>
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/auth/login</code>
+            <p>Đăng nhập vào hệ thống</p>
+        </div>
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/auth/me</code>
+            <p>Xem thông tin profile của mình</p>
+        </div>
+        <div class="endpoint">
+            <span class="method put">PUT</span>
+            <code>/auth/me</code>
+            <p>Cập nhật profile (city, discipline, interests, bio)</p>
+        </div>
+
+        <h3>📝 Posts (US3, US4)</h3>
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/posts</code>
+            <p>Tạo bài viết mới (ride report, tip, event)</p>
+        </div>
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/posts</code>
+            <p>Lấy danh sách bài viết (có phân trang: limit, offset)</p>
+        </div>
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/posts/{id}</code>
+            <p>Xem chi tiết một bài viết</p>
+        </div>
+
+        <h3>🚲 Bikes (US5)</h3>
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/bikes</code>
+            <p>Thêm xe đạp mới</p>
+        </div>
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/bikes/my-bikes</code>
+            <p>Xem danh sách xe đạp của mình</p>
+        </div>
+    </div>
+
+    <div class="endpoints" style="margin-top: 20px;">
+        <h2>💡 Hướng dẫn sử dụng</h2>
+        <ol>
+            <li>Click vào <strong>"Mở Swagger UI"</strong> để mở giao diện test API</li>
+            <li>Trong Swagger UI, bạn có thể:
+                <ul>
+                    <li>Xem tất cả các endpoints</li>
+                    <li>Xem request/response schema</li>
+                    <li>Click "Try it out" để test API trực tiếp</li>
+                    <li>Nhập dữ liệu và click "Execute"</li>
+                </ul>
+            </li>
+            <li>Thử tạo user mới với <code>POST /auth/register</code></li>
+            <li>Thử tạo bài viết với <code>POST /posts</code></li>
+            <li>Thử thêm xe đạp với <code>POST /bikes</code></li>
+        </ol>
+    </div>
+</body>
+</html>

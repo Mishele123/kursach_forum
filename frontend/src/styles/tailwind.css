@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* VELO Design System */
+@layer base {
+  :root {
+    --velo-green: #2F6B4F;
+    --velo-green-light: #E8F5F0;
+    --velo-gray: #F5F5F5;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply font-semibold px-6 py-3 rounded-xl transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-velo-green hover:bg-velo-green-600 text-white shadow-sm hover:shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-velo-green border-2 border-gray-200 hover:border-velo-green;
+  }
+  
+  .btn-outline {
+    @apply bg-transparent hover:bg-velo-green-50 text-velo-green border-2 border-velo-green;
+  }
+  
+  /* Input Fields */
+  .input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-velo-green focus:border-transparent transition-all;
+  }
+  
+  .textarea {
+    @apply input min-h-[120px] resize-y;
+  }
+  
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .card-hover {
+    @apply card hover:translate-y-[-4px] transition-all duration-200;
+  }
+  
+  /* Navigation */
+  .nav-link {
+    @apply text-gray-700 hover:text-velo-green font-medium transition-colors;
+  }
+  
+  .nav-link-active {
+    @apply nav-link text-velo-green;
+  }
+  
+  /* Sidebar */
+  .sidebar-link {
+    @apply block px-4 py-3 rounded-lg text-gray-700 hover:bg-velo-green-50 hover:text-velo-green font-medium transition-colors;
+  }
+  
+  .sidebar-link-active {
+    @apply sidebar-link bg-velo-green text-white hover:bg-velo-green-600 hover:text-white;
+  }
+}

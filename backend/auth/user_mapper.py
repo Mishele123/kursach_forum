@@ -1,6 +1,7 @@
 """User mapping utilities for converting between DTOs and Entities"""
 from datetime import datetime, timezone
 
+from auth.password import hash_password
 from auth.user_dto import CreateUserDto, UpdateUserDto, UserResponseDto
 from auth.user_entity import User, UserRole
 
@@ -21,7 +22,7 @@ class UserMapper:
             
         Note:
             - ID will be set by storage layer
-            - Password should be hashed (TODO: implement password hashing)
+            - Password is hashed using Argon2
             - All optional fields initialized with None or default values
         """
         now = datetime.now(timezone.utc)
@@ -29,7 +30,7 @@ class UserMapper:
         return User(
             id=0,  # Will be assigned by storage
             username=dto.username,
-            password_hash=dto.password,  # TODO: Hash password with bcrypt/argon2
+            password_hash=hash_password(dto.password),  # Hash password with Argon2
             email=None,
             role=UserRole.USER,
             avatar_url=None,

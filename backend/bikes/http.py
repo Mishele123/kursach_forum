@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, HTTPException
 
+from auth.dependencies import CurrentUserId
 from auth.user_interfaces import UserRepository
 from bikes.bike_dto import CreateBikeDto, BikeResponseDto
 from bikes.bike_entity import Bike
@@ -14,11 +15,15 @@ router = APIRouter(prefix="/bikes", tags=["bikes"], route_class=DishkaRoute)
 @router.post("", status_code=201)
 async def create_bike(
     dto: CreateBikeDto,
+    user_id: CurrentUserId,
     bike_storage: FromDishka[BikeStorage],
-    user_repo: FromDishka[UserRepository],
-    user_id: int = 1  # Temporary: hardcoded (should come from JWT)
+    user_repo: FromDishka[UserRepository]
 ) -> BikeResponseDto:
-    """Add a bike (US5)"""
+    """
+    Add a bike (US5).
+    
+    Requires: Bearer token in Authorization header
+    """
     # Verify user exists
     user = await user_repo.read(user_id)
     if not user:
@@ -48,10 +53,14 @@ async def create_bike(
 
 @router.get("/my-bikes")
 async def get_my_bikes(
-    bike_storage: FromDishka[BikeStorage],
-    user_id: int = 1  # Temporary: hardcoded
+    user_id: CurrentUserId,
+    bike_storage: FromDishka[BikeStorage]
 ) -> list[BikeResponseDto]:
-    """Get current user's bikes (US5)"""
+    """
+    Get current user's bikes (US5).
+    
+    Requires: Bearer token in Authorization header
+    """
     bikes = await bike_storage.get_by_user(user_id)
     
     return [

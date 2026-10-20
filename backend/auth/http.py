@@ -2,6 +2,9 @@
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, status, HTTPException
 
+from auth.dependencies import CurrentUser, CurrentUserId
+from auth.jwt import create_access_token
+from auth.password import verify_password
 from auth.user_dto import CreateUserDto, LoginDto, UserResponseDto, UpdateUserDto
 from auth.user_interactor import CreateUserInteractor
 from auth.user_interfaces import UserRepository
@@ -40,7 +43,7 @@ async def register_user(
     path="/login",
     response_model=dict,
     summary="User login",
-    description="Authenticate user with username and password (US1)"
+    description="Authenticate user with username and password, returns JWT token (US1)"
 )
 async def login_user(
     dto: LoginDto,
@@ -52,7 +55,7 @@ async def login_user(
     - **username**: Your username
     - **password**: Your password
     
-    Returns user info (TODO: should return JWT token).
+    Returns JWT access token and user info.
     """
     # Find user by username
     all_users = await repo.read_all()
@@ -64,16 +67,20 @@ async def login_user(
             detail="Invalid username or password"
         )
     
-    # Verify password (TODO: use proper password hashing verification)
-    if user.password_hash != dto.password:
+    # Verify password using Argon2
+    if not verify_password(dto.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
     
-    # Return success with user info (TODO: return JWT token instead)
+    # Create JWT access token
+    access_token = create_access_token(user_id=user.id, username=user.username)
+    
+    # Return token and user info
     return {
-        "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer",
         "user": UserMapper.entity_to_response_dto(user)
     }
 
@@ -85,23 +92,14 @@ async def login_user(
     description="Retrieve current authenticated user's profile information (US2)"
 )
 async def get_current_user(
-    repo: FromDishka[UserRepository],
-    user_id: int = 1  # TODO: Extract from JWT token instead of hardcoded
+    current_user: CurrentUser
 ) -> UserResponseDto:
     """
     Get current user's profile.
     
-    TODO: user_id should come from JWT token authentication.
+    Requires: Bearer token in Authorization header
     """
-    user = await repo.read(user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
-    
-    return UserMapper.entity_to_response_dto(user)
+    return UserMapper.entity_to_response_dto(current_user)
 
 
 @router.put(
@@ -112,27 +110,18 @@ async def get_current_user(
 )
 async def update_profile(
     dto: UpdateUserDto,
-    repo: FromDishka[UserRepository],
-    user_id: int = 1  # TODO: Extract from JWT token instead of hardcoded
+    current_user: CurrentUser,
+    repo: FromDishka[UserRepository]
 ) -> UserResponseDto:
     """
     Update current user's profile (partial update).
     
     Only provided fields will be updated. Null/None values are ignored.
     
-    TODO: user_id should come from JWT token authentication.
+    Requires: Bearer token in Authorization header
     """
-    # Retrieve existing user
-    user = await repo.read(user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
-    
-    # Apply updates from DTO
-    updated_user = UserMapper.update_entity_from_dto(user, dto)
+    # Apply updates from DTO to current user entity
+    updated_user = UserMapper.update_entity_from_dto(current_user, dto)
     
     # Persist changes
     await repo.update(updated_user)

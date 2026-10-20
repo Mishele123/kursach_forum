@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, HTTPException, Query
 
+from auth.dependencies import CurrentUserId
 from auth.user_interfaces import UserRepository
 from posts.post_dto import CreatePostDto, PostResponseDto
 from posts.post_entity import Post
@@ -14,11 +15,15 @@ router = APIRouter(prefix="/posts", tags=["posts"], route_class=DishkaRoute)
 @router.post("", status_code=201)
 async def create_post(
     dto: CreatePostDto,
+    author_id: CurrentUserId,
     post_storage: FromDishka[PostStorage],
-    user_repo: FromDishka[UserRepository],
-    author_id: int = 1  # Temporary: hardcoded (should come from JWT)
+    user_repo: FromDishka[UserRepository]
 ) -> PostResponseDto:
-    """Create a new post (US3)"""
+    """
+    Create a new post (US3).
+    
+    Requires: Bearer token in Authorization header
+    """
     # Verify user exists
     user = await user_repo.read(author_id)
     if not user:

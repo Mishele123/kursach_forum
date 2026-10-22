@@ -45,6 +45,7 @@ docker compose up -d --wait postgres redis
 docker compose build backend
 docker compose run --rm backend alembic upgrade head
 docker compose up -d backend
+docker compose exec backend python seed.py
 ```
 
 Compose задаёт адреса `postgres` и `redis` для бэкенда внутри контейнера.

@@ -40,6 +40,16 @@ class CreateUserDto(BaseModel):
 
 class UpdateUserDto(BaseModel):
     """DTO for updating user profile (US2)"""
+    username: str | None = Field(None, min_length=3, max_length=50)
+    avatar_url: str | None = Field(None, max_length=255)
+
+    @field_validator("username")
+    @classmethod
+    def valid_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return CreateUserDto.valid_username(value)
+
     city: str | None = Field(None, max_length=100, description="City of residence")
     discipline: str | None = Field(None, max_length=100, description="Cycling discipline (MTB, Road, etc.)")
     interests: str | None = Field(None, max_length=500, description="Cycling interests")

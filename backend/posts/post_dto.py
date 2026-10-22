@@ -23,4 +23,5 @@ class PostResponseDto(BaseModel):
     photo_url: str | None
     author_id: int
     author_username: str | None  # For display in feed
+    author_avatar_url: str | None = None
     created_at: datetime

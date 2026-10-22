@@ -43,9 +43,14 @@ class SqlAlchemyUserRepository(UserRepository):
             raise HTTPException(409, "Имя пользователя или email уже заняты") from error
 
     async def update(self, entity: User) -> bool:
-        async with self.database.session() as session:
-            result = await session.execute(update(UserRow).where(UserRow.id == entity.id).values(**entity.model_dump(exclude={"id"})))
-            return result.rowcount > 0
+        values = entity.model_dump(exclude={"id"})
+        values["username_key"] = entity.username.casefold()
+        try:
+            async with self.database.session() as session:
+                result = await session.execute(update(UserRow).where(UserRow.id == entity.id).values(**values))
+                return result.rowcount > 0
+        except IntegrityError as error:
+            raise HTTPException(409, "Имя пользователя уже занято") from error
 
     async def delete(self, id: int) -> bool:
         async with self.database.session() as session:

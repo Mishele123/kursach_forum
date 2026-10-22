@@ -9,6 +9,7 @@ class CreateBikeDto(BaseModel):
     brand: str = Field(..., min_length=1, max_length=100)
     model: str = Field(..., min_length=1, max_length=100)
     year: int = Field(..., ge=1800, le=datetime.now().year + 1)  # Year validation
+    photo_url: str | None = Field(None, max_length=255)
 
 
 class BikeResponseDto(BaseModel):
@@ -19,3 +20,4 @@ class BikeResponseDto(BaseModel):
     year: int
     user_id: int
     created_at: datetime
+    photo_url: str | None = None

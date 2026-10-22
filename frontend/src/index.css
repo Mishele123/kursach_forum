@@ -13,13 +13,11 @@ h1{font-size:28px;line-height:36px;font-weight:700;letter-spacing:-.6px}
 h2{font-size:21px;line-height:1.4;font-weight:600}
 p{font-size:14px}
 hr{border:0;border-top:1px solid #dfe5dc;margin:24px 0}
-.velo-header{height:94px;background:white;display:grid;grid-template-columns:103px 500px 226px 163px 42px;align-items:center;column-gap:28px;padding:20px 24px;position:sticky;top:0;z-index:20;max-width:1440px;margin:0 auto}
-.velo-header::before{content:"";position:absolute;inset:0 calc((min(100vw, 1440px) - 100vw) / 2);background:#fff;z-index:-1}
-.velo-header>.avatar{margin-left:26px}
+.velo-header{height:94px;background:white;display:flex;align-items:center;gap:28px;padding:20px 24px;position:sticky;top:0;z-index:20;width:100%}
 .logo{font-size:34px;font-weight:700;color:#246b50;letter-spacing:-1px}
-.header-search{width:100%;margin:0}
+.header-search{flex:1;min-width:0;margin:0}
 .header-search input{width:100%;background:#f5f7f3;border:0;border-radius:12px;padding:13px;font-size:14px}
-.header-tagline{color:#7c877f;font-size:12px;text-align:center}
+.header-tagline{color:#7c877f;font-size:12px;text-align:center;white-space:nowrap}
 .velo-header>.velo-button{white-space:nowrap}
 .velo-button{border:0;background:#246b50;color:white;display:inline-flex;align-items:center;justify-content:center;border-radius:11px;padding:12px 22px;font-size:13px;font-weight:600;line-height:1.2}
 .velo-button:hover{background:#1a553e}
@@ -45,12 +43,25 @@ hr{border:0;border-top:1px solid #dfe5dc;margin:24px 0}
 .velo-form{padding:28px;display:grid;gap:22px}
 .velo-form .subtitle{margin:0}
 .velo-form input,.velo-form textarea{background:#f5f7f3;border:0;border-radius:11px;box-shadow:none}
+.velo-form input[type="file"]{padding:8px 12px;max-width:100%;min-width:0}
+.velo-form input[type="file"]::file-selector-button{margin-right:10px}
 .velo-form label{color:#1b3028;font-size:12px}
 .velo-form input:focus,.velo-form textarea:focus{outline:2px solid #246b50}
 .form-actions{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .form-actions button{min-height:44px}
 .avatar{width:40px;height:40px;background:#eaf1e6;display:flex;align-items:center;justify-content:center;color:#246b50;border-radius:50%;font-size:14px;flex-shrink:0}
 .avatar.large{width:76px;height:76px;font-size:26px;margin-bottom:18px}
+.avatar img.avatar-image{width:100%;height:100%;object-fit:cover;border-radius:inherit;margin:0;display:block}
+.profile-fields{border:0;padding:0;margin:0;min-width:0;display:grid;gap:20px}
+.profile-avatar-editor{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.profile-avatar-editor .avatar{margin:0}
+.profile-avatar-editor>div:last-child{min-width:0;flex:1 1 220px}
+.profile-avatar-editor input{max-width:100%}
+.profile-avatar-editor .subtitle{margin:4px 0 8px}
+.avatar-remove{display:block;margin-top:10px;border:0;background:transparent;padding:0;color:#246b50;text-decoration:underline}
+.bike-photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:12px;margin-bottom:16px}
+.profile-bike{margin-bottom:20px}
+.profile-bike .bike-photo{max-width:360px}
 .velo-right{display:grid;gap:20px;align-content:start}
 .velo-right .velo-card{padding:20px;margin:0}
 .velo-right h2{font-size:18px}

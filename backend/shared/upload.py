@@ -23,6 +23,16 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 
+def owned_image_url(value: str, user_id: int) -> str:
+    """Only attach an existing local image uploaded by the current account."""
+    filename = Path(value).name
+    if (value != f"/uploads/{filename}" or "\\" in filename
+            or not filename.startswith(f"{user_id}_")
+            or not (UPLOAD_DIR / filename).is_file()):
+        raise HTTPException(400, "Выберите изображение, загруженное вашим аккаунтом")
+    return value
+
+
 def validate_file_size(file: UploadFile, max_size: int = MAX_FILE_SIZE) -> None:
     """
     Validate file size.

@@ -11,3 +11,4 @@ class Bike(BaseModel):
     year: int  # Год выпуска
     user_id: int  # Owner
     created_at: datetime
+    photo_url: str | None = None

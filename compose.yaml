@@ -39,6 +39,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       VELO_UPLOAD_DIR: /app/uploads
       VELO_COOKIE_SECURE: ${VELO_COOKIE_SECURE:-0}
+      VELO_SEED_DEMO: ${VELO_SEED_DEMO:-1}
       CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000
     ports:
       - "127.0.0.1:8001:8000"

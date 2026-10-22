@@ -1,5 +1,3 @@
-import type { PostCategory } from '../types';
-
 // Format date to relative time (Russian)
 export const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
@@ -46,22 +44,6 @@ const getDaysWord = (count: number): string => {
   return 'дней';
 };
 
-// Get category color
-export const getCategoryColor = (category: PostCategory): string => {
-  const colors: Record<PostCategory, string> = {
-    'обслуживание': 'bg-blue-500',
-    'апгрейд': 'bg-purple-500',
-    'маршрут': 'bg-green-500',
-    'трюки': 'bg-red-500',
-  };
-  return colors[category] || 'bg-gray-500';
-};
-
-// Get category display name (already in Russian)
-export const getCategoryDisplayName = (category: PostCategory): string => {
-  return category.charAt(0).toUpperCase() + category.slice(1);
-};
-
 // Get user initials for avatar
 export const getUserInitials = (username: string): string => {
   return username
@@ -70,16 +52,4 @@ export const getUserInitials = (username: string): string => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-};
-
-// Validate email
-export const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-// Truncate text
-export const truncateText = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
 };

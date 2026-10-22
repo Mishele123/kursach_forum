@@ -8,6 +8,7 @@ from auth.user_interfaces import UserRepository
 from bikes.bike_dto import CreateBikeDto, BikeResponseDto
 from bikes.bike_entity import Bike
 from bikes.bike_storage import BikeStorage
+from shared.upload import owned_image_url
 
 router = APIRouter(prefix="/bikes", tags=["bikes"], route_class=DishkaRoute)
 
@@ -29,12 +30,16 @@ async def create_bike(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    if dto.photo_url is not None:
+        dto.photo_url = owned_image_url(dto.photo_url, user_id)
+
     # Create bike
     bike = Bike(
         id=0,
         brand=dto.brand,
         model=dto.model,
         year=dto.year,
+        photo_url=dto.photo_url,
         user_id=user_id,
         created_at=datetime.now(timezone.utc)
     )
@@ -46,6 +51,7 @@ async def create_bike(
         brand=created_bike.brand,
         model=created_bike.model,
         year=created_bike.year,
+        photo_url=created_bike.photo_url,
         user_id=created_bike.user_id,
         created_at=created_bike.created_at
     )
@@ -69,6 +75,7 @@ async def get_my_bikes(
             brand=bike.brand,
             model=bike.model,
             year=bike.year,
+            photo_url=bike.photo_url,
             user_id=bike.user_id,
             created_at=bike.created_at
         )

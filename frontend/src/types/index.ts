@@ -4,7 +4,7 @@ export interface User {
   username: string;
   email?: string;
   role: 'USER' | 'MODERATOR' | 'ADMIN';
-  avatar_url?: string;
+  avatar_url?: string | null;
   bio?: string;
   city?: string;
   discipline?: string;
@@ -24,6 +24,8 @@ export interface LoginDto {
 }
 
 export interface UpdateUserDto {
+  username?: string;
+  avatar_url?: string | null;
   city?: string;
   discipline?: string;
   interests?: string;
@@ -41,6 +43,7 @@ export interface Post {
   photo_url?: string;
   author_id: number;
   author_username?: string;
+  author_avatar_url?: string | null;
   created_at: string;
 }
 
@@ -57,6 +60,7 @@ export interface Bike {
   brand: string;
   model: string;
   year: number;
+  photo_url?: string | null;
   user_id: number;
   created_at: string;
 }
@@ -65,6 +69,7 @@ export interface CreateBikeDto {
   brand: string;
   model: string;
   year: number;
+  photo_url?: string;
 }
 
 // Auth response

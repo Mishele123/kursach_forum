@@ -36,6 +36,9 @@ def check(browser, base_url, width, height, output):
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     upload_path = None
+    avatar_path = None
+    bike_path = None
+    renamed = username + "_new"
     try:
         page.goto(base_url + "/register")
         page.get_by_label("Имя пользователя", exact=True).fill(username)
@@ -46,20 +49,46 @@ def check(browser, base_url, width, height, output):
         page.wait_for_url("**/feed")
         expect(page.locator(".velo-header .logo")).to_have_text("velo.")
         page.goto(base_url + "/profile/edit")
+        page.get_by_label("Имя пользователя", exact=True).fill(renamed)
+        avatar = io.BytesIO()
+        Image.new("RGB", (80, 80), "#246b50").save(avatar, "PNG")
+        page.get_by_label("Фото профиля", exact=True).set_input_files({"name":"avatar.png", "mimeType":"image/png", "buffer":avatar.getvalue()})
+        expect(page.locator(".profile-avatar-editor img")).to_be_visible()
         page.get_by_label("Город", exact=True).fill("Самара")
         page.get_by_label("Дисциплина", exact=True).fill("MTB")
         page.get_by_label("Интересы", exact=True).fill("Маршруты, велопутешествия")
         page.get_by_label("О себе", exact=True).fill("Проверка первого спринта")
-        page.get_by_role("button", name="Сохранить изменения", exact=True).click()
+        with page.expect_response(lambda response: response.url.endswith("/uploads") and response.request.method == "POST") as avatar_uploaded:
+            page.get_by_role("button", name="Сохранить изменения", exact=True).click()
+        avatar_path = avatar_uploaded.value.json()["url"]
         page.wait_for_url("**/profile")
         expect(page.locator(".velo-main")).to_contain_text("Самара")
+        expect(page.locator(".velo-main h2").first).to_have_text(renamed)
+        expect(page.locator(".velo-header .avatar img")).to_have_attribute("src", avatar_path)
+        page.reload()
+        expect(page.locator(".velo-header .avatar img")).to_have_attribute("src", avatar_path)
         page.goto(base_url + "/bikes/add")
         page.get_by_label("Бренд *", exact=True).fill("Trek")
         page.get_by_label("Модель *", exact=True).fill("Marlin 7")
         page.get_by_label("Год выпуска *", exact=True).fill("2023")
-        page.get_by_role("button", name="Добавить велосипед", exact=True).click()
+        bike_image = {"name":"bike.png", "mimeType":"image/png", "buffer":avatar.getvalue()}
+        page.get_by_label("Фото велосипеда", exact=True).set_input_files({"name":"bad.txt", "mimeType":"text/plain", "buffer":b"not an image"})
+        expect(page.get_by_role("alert")).to_be_visible()
+        page.get_by_label("Фото велосипеда", exact=True).set_input_files(bike_image)
+        expect(page.get_by_alt_text("Предпросмотр велосипеда")).to_be_visible()
+        page.get_by_role("button", name="Убрать фотографию", exact=True).click()
+        expect(page.get_by_alt_text("Предпросмотр велосипеда")).to_have_count(0)
+        page.get_by_label("Фото велосипеда", exact=True).set_input_files(bike_image)
+        with page.expect_response(lambda response: response.url.endswith("/uploads") and response.request.method == "POST") as bike_uploaded:
+            page.get_by_role("button", name="Добавить велосипед", exact=True).click()
+        bike_path = bike_uploaded.value.json()["url"]
         page.wait_for_url("**/bikes")
         expect(page.locator(".bike-grid")).to_contain_text("Trek Marlin 7")
+        expect(page.locator(".bike-grid .bike-photo")).to_have_attribute("src", bike_path)
+        page.reload()
+        expect(page.locator(".bike-grid .bike-photo")).to_have_attribute("src", bike_path)
+        page.wait_for_function("() => document.querySelector('.bike-grid .bike-photo')?.naturalWidth > 0")
+        page.screenshot(path=str(output / f"bikes-{width}.png"), full_page=True)
         page.goto(base_url + "/post/create")
         title = "Велопрогулка " + username
         page.get_by_label("Заголовок *", exact=True).fill(title)
@@ -68,12 +97,13 @@ def check(browser, base_url, width, height, output):
         Image.new("RGB", (60, 40), "#246b50").save(buffer, "PNG")
         page.get_by_label("+ Добавьте одну фотографию", exact=True).set_input_files({"name":"ride.png", "mimeType":"image/png", "buffer":buffer.getvalue()})
         expect(page.get_by_alt_text("Предпросмотр фотографии")).to_be_visible()
-        with page.expect_response(lambda response: response.url.endswith("/api/uploads") and response.request.method == "POST") as uploaded:
+        with page.expect_response(lambda response: response.url.endswith("/uploads") and response.request.method == "POST") as uploaded:
             page.get_by_role("button", name="Опубликовать", exact=True).click()
         upload_path = uploaded.value.json()["url"]
         page.wait_for_url("**/feed")
         card = page.locator(".post-card").filter(has=page.get_by_role("heading", name=title, exact=True))
         expect(card).to_be_visible()
+        expect(card.locator(".post-author .avatar img")).to_have_attribute("src", avatar_path)
         expect(card.locator("strong").filter(has_text="Лесные тропы")).to_be_visible()
         expect(card.get_by_alt_text(title)).to_be_visible()
         page.screenshot(path=str(output / f"feed-{width}.png"), full_page=True)
@@ -91,17 +121,28 @@ def check(browser, base_url, width, height, output):
         expect(page.locator(".velo-header .avatar")).to_be_visible()
         page.goto(base_url + "/profile")
         expect(page.locator(".velo-main")).to_contain_text("Trek Marlin 7")
+        expect(page.locator(".profile-bike .bike-photo")).to_have_attribute("src", bike_path)
+        expect(page.locator(".velo-main h2").first).to_have_text(renamed)
+        expect(page.locator(".velo-header .avatar img")).to_have_attribute("src", avatar_path)
+        page.goto(base_url + "/profile/edit")
+        page.get_by_role("button", name="Убрать фото", exact=True).click()
+        page.get_by_role("button", name="Сохранить изменения", exact=True).click()
+        page.wait_for_url("**/profile")
+        expect(page.locator(".velo-header .avatar img")).to_have_count(0)
         page.get_by_role("button", name="Выйти из аккаунта", exact=True).click()
         page.wait_for_url("**/login")
         if errors:
             raise AssertionError(errors)
-        print(f"PASS: {width}px registration, profile, bike, photo post, detail, login, session reload and logout")
+        print(f"PASS: {width}px registration, rename, avatar upload/removal, bike photo, photo post, detail, login, session reload and logout")
     finally:
         context.close()
         with ThreadPoolExecutor(max_workers=1) as executor:
             executor.submit(lambda: asyncio.run(remove_test_account(username))).result()
-        if upload_path:
-            name = Path(upload_path).name
+            executor.submit(lambda: asyncio.run(remove_test_account(renamed))).result()
+        for path in [upload_path, avatar_path, bike_path]:
+            if not path:
+                continue
+            name = Path(path).name
             if name.endswith(".png"):
                 from shared.upload import UPLOAD_DIR
                 (UPLOAD_DIR / name).unlink(missing_ok=True)

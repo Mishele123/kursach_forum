@@ -6,6 +6,8 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 COPY backend ./backend
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY demo_data ./demo_data
+COPY scripts ./scripts
 RUN mkdir -p /app/uploads
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --app-dir backend --host 0.0.0.0 --port 8000 --proxy-headers"]

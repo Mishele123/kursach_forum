@@ -12,6 +12,7 @@ from auth.user_dto import CreateUserDto, LoginDto, UserResponseDto, UpdateUserDt
 from auth.user_interactor import CreateUserInteractor
 from auth.user_interfaces import UserRepository
 from auth.user_mapper import UserMapper
+from shared.upload import owned_image_url
 
 router = APIRouter(tags=["auth"], route_class=DishkaRoute)
 
@@ -148,6 +149,9 @@ async def update_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User with ID {user_id} not found"
         )
+
+    if dto.avatar_url is not None:
+        dto.avatar_url = owned_image_url(dto.avatar_url, user_id)
 
     # Apply updates from DTO
     updated_user = UserMapper.update_entity_from_dto(user, dto)

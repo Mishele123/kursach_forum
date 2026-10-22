@@ -60,6 +60,7 @@ async def create_post(
         photo_url=created_post.photo_url,
         author_id=created_post.author_id,
         author_username=user.username,
+        author_avatar_url=user.avatar_url,
         created_at=created_post.created_at
     )
 
@@ -100,5 +101,6 @@ async def get_post(
         photo_url=post.photo_url,
         author_id=post.author_id,
         author_username=author.username if author else "Unknown",
+        author_avatar_url=author.avatar_url if author else None,
         created_at=post.created_at
     )

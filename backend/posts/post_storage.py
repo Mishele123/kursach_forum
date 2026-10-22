@@ -24,7 +24,7 @@ class PostStorage:
             return Post.model_validate(row, from_attributes=True) if row else None
 
     async def get_all(self, limit: int = 20, offset: int = 0, category: str | None = None, author_id: int | None = None, q: str | None = None) -> list[PostResponseDto]:
-        query = select(PostRow, UserRow.username).join(UserRow, UserRow.id == PostRow.author_id)
+        query = select(PostRow, UserRow.username, UserRow.avatar_url).join(UserRow, UserRow.id == PostRow.author_id)
         if category:
             query = query.where(PostRow.category == category)
         if author_id is not None:
@@ -35,4 +35,4 @@ class PostStorage:
         query = query.order_by(PostRow.created_at.desc(), PostRow.id.desc()).limit(limit).offset(offset)
         async with self.database.session() as session:
             rows = (await session.execute(query)).all()
-            return [PostResponseDto(**Post.model_validate(row, from_attributes=True).model_dump(exclude={"updated_at"}), author_username=username) for row, username in rows]
+            return [PostResponseDto(**Post.model_validate(row, from_attributes=True).model_dump(exclude={"updated_at"}), author_username=username, author_avatar_url=avatar_url) for row, username, avatar_url in rows]

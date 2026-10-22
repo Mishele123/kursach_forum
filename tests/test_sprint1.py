@@ -206,6 +206,134 @@ class SprintOneTests(unittest.TestCase):
     def test_anonymous_upload_is_rejected(self):
         self.assertEqual(self.client.post("/uploads",files={"file":("photo.png",b"image","image/png")}).status_code,401)
 
+    def upload_avatar(self):
+        import io
+        from PIL import Image
+        buffer = io.BytesIO()
+        Image.new("RGB", (16, 16), "green").save(buffer, "PNG")
+        response = self.client.post("/uploads", files={"file": ("avatar.png", buffer.getvalue(), "image/png")})
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()["url"]
+
+    def test_rename_updates_login_and_existing_posts(self):
+        self.login()
+        post_id = self.post().json()["id"]
+        response = self.client.put("/auth/me", json={"username": "  Alice_Rider  "})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["username"], "Alice_Rider")
+        self.assertEqual(self.client.get("/auth/me").json()["username"], "Alice_Rider")
+        self.assertEqual(self.client.get(f"/posts/{post_id}").json()["author_username"], "Alice_Rider")
+        self.assertEqual(self.client.get("/posts").json()[0]["author_username"], "Alice_Rider")
+        self.client.post("/auth/logout")
+        self.assertEqual(self.client.post("/auth/login", json={"username":"alice", "password":"secret123"}).status_code, 401)
+        self.assertEqual(self.client.post("/auth/login", json={"username":"ALICE_RIDER", "password":"secret123"}).status_code, 200)
+        self.assertEqual(self.client.post("/auth/login", json={"email":"alice@example.com", "password":"secret123"}).status_code, 200)
+
+    def test_rename_validation_duplicates_and_atomic_profile_update(self):
+        self.login()
+        for username in ["", "  ", " a ", "x" * 51]:
+            self.assertEqual(self.client.put("/auth/me", json={"username":username}).status_code, 422)
+        self.assertEqual(self.client.put("/auth/me", json={"username":"BOB", "city":"Not saved"}).status_code, 409)
+        profile = self.client.get("/auth/me").json()
+        self.assertEqual(profile["username"], "alice")
+        self.assertIsNone(profile["city"])
+        self.assertEqual(self.client.put("/auth/me", json={"username":"ALICE"}).status_code, 200)
+        self.assertEqual(self.client.post("/auth/register", json={"username":"alice", "email":"new@example.com", "password":"secret123"}).status_code, 409)
+        self.login("bob@example.com")
+        self.assertEqual(self.client.get("/auth/me").json()["username"], "bob")
+
+    def test_avatar_ownership_persistence_and_removal(self):
+        token = self.login()
+        url = self.upload_avatar()
+        post_id = self.post().json()["id"]
+        response = self.client.put("/auth/me", json={"avatar_url":url, "username":"alice_new"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["avatar_url"], url)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.get(f"/posts/{post_id}").json()["author_avatar_url"], url)
+        self.assertEqual(self.client.get("/posts").json()[0]["author_avatar_url"], url)
+        with TestClient(get_app(self.database_url, self.redis_client())) as restarted:
+            response = restarted.get("/auth/me", headers={"Authorization":f"Bearer {token}"})
+            self.assertEqual(response.json()["username"], "alice_new")
+            self.assertEqual(response.json()["avatar_url"], url)
+        self.login("bob@example.com")
+        self.assertEqual(self.client.put("/auth/me", json={"avatar_url":url}).status_code, 400)
+        self.assertIsNone(self.client.get("/auth/me").json()["avatar_url"])
+        self.login()
+        for value in ["https://example.com" + url, "/uploads/missing.png", url + "?x=1", "/uploads/../" + url.split("/")[-1], ""]:
+            self.assertEqual(self.client.put("/auth/me", json={"avatar_url":value}).status_code, 400)
+        self.assertEqual(self.client.get("/auth/me").json()["avatar_url"], url)
+        self.assertEqual(self.client.put("/auth/me", json={"city":"Samara"}).json()["avatar_url"], url)
+        self.assertIsNone(self.client.put("/auth/me", json={"avatar_url":None}).json()["avatar_url"])
+        self.assertIsNone(self.client.get("/posts").json()[0]["author_avatar_url"])
+
+    def test_bike_photo_ownership_and_persistence(self):
+        token = self.login()
+        url = self.upload_avatar()
+        bike = {"brand":"Trek", "model":"Marlin", "year":2023, "photo_url":url}
+        response = self.client.post("/bikes", json=bike)
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["photo_url"], url)
+        self.assertEqual(self.client.get("/bikes/my-bikes").json()[0]["photo_url"], url)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        with TestClient(get_app(self.database_url, self.redis_client())) as restarted:
+            saved = restarted.get("/bikes/my-bikes", headers={"Authorization":f"Bearer {token}"})
+            self.assertEqual(saved.json()[0]["photo_url"], url)
+        for value in ["", "https://example.com" + url, "/uploads/missing.png", url + "?x=1"]:
+            self.assertEqual(self.client.post("/bikes", json={**bike, "photo_url":value}).status_code, 400)
+        self.login("bob@example.com")
+        self.assertEqual(self.client.post("/bikes", json=bike).status_code, 400)
+        self.assertEqual(self.client.get("/bikes/my-bikes").json(), [])
+        response = self.client.post("/bikes", json={"brand":"Giant", "model":"Escape", "year":2024})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertIsNone(response.json()["photo_url"])
+
+    def test_demo_seed_is_repeatable_and_preserves_existing_posts(self):
+        from demo import seed_demo
+        from models import PostRow
+        from sqlalchemy import update, func
+        self.login()
+        original = self.post(title="My own post").json()
+        self.assertEqual(self.client.portal.call(seed_demo, self.app.state.database), 5)
+        self.assertEqual(self.client.portal.call(seed_demo, self.app.state.database), 0)
+        posts = self.client.get("/posts").json()
+        self.assertEqual(len(posts), 6)
+        self.assertEqual(self.client.get(f"/posts/{original['id']}").json()["title"], "My own post")
+        examples = [p for p in posts if p["id"] != original["id"]]
+        for post in examples:
+            self.assertTrue(post["photo_url"].startswith("/demo-assets/"))
+            self.assertEqual(self.client.get(post["photo_url"]).status_code, 200)
+        async def edit_example():
+            async with self.app.state.database.session() as session:
+                await session.execute(update(PostRow).where(PostRow.id == examples[0]["id"]).values(title="Keep this edit"))
+        self.client.portal.call(edit_example)
+        self.assertEqual(self.client.portal.call(seed_demo, self.app.state.database), 0)
+        self.assertEqual(self.client.get(f"/posts/{examples[0]['id']}").json()["title"], "Keep this edit")
+
+    def test_demo_seed_skips_originals_and_never_reuses_real_accounts(self):
+        import json
+        from demo import seed_demo, DEMO_DIR
+        from models import PostRow
+        from sqlalchemy import func
+        data = json.loads((DEMO_DIR / "posts.json").read_text(encoding="utf-8"))
+        author_name = data["authors"][0]["username"]
+        self.register(author_name, "demo-collision@example.com")
+        self.login("demo-collision@example.com")
+        first = data["posts"][0]
+        self.post(title=first["title"], text=first["text"], category=first["category"])
+        self.assertEqual(self.client.portal.call(seed_demo, self.app.state.database), 4)
+        self.assertEqual(self.client.portal.call(seed_demo, self.app.state.database), 0)
+        self.assertFalse(self.user_record(author_name).is_banned)
+        real_id = self.user_record(author_name).id
+        async def inspect():
+            async with self.app.state.database.session() as session:
+                demo_users = (await session.scalars(select(UserRow).where(UserRow.demo_key.is_not(None)))).all()
+                self.assertEqual(len(demo_users), 1)
+                self.assertTrue(demo_users[0].is_banned)
+                self.assertNotEqual(demo_users[0].id, real_id)
+                self.assertIsNone(demo_users[0].email)
+        self.client.portal.call(inspect)
+
 
 if __name__ == "__main__":
     unittest.main()

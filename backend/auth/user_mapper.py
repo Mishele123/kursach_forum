@@ -101,6 +101,12 @@ class UserMapper:
         Note:
             Only updates fields that are not None in the DTO (partial update pattern)
         """
+        if dto.username is not None:
+            user.username = dto.username
+
+        if "avatar_url" in dto.model_fields_set:
+            user.avatar_url = dto.avatar_url
+
         if dto.city is not None:
             user.city = dto.city
         

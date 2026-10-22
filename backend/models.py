@@ -12,6 +12,7 @@ class Base(DeclarativeBase):
 class UserRow(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    demo_key: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     username: Mapped[str] = mapped_column(String(50))
     username_key: Mapped[str] = mapped_column(String(150), unique=True)
     email: Mapped[str | None] = mapped_column(String(254))
@@ -40,6 +41,7 @@ class PostRow(Base):
         Index("ix_posts_category_created", "category", "created_at"),
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    demo_key: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     text: Mapped[str] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(30))
@@ -59,6 +61,7 @@ class BikeRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     brand: Mapped[str] = mapped_column(String(100))
     model: Mapped[str] = mapped_column(String(100))
+    photo_url: Mapped[str | None] = mapped_column(Text)
     year: Mapped[int] = mapped_column(Integer)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

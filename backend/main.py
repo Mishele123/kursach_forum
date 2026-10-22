@@ -20,6 +20,7 @@ from ioc import AppProvider
 from posts.http import router as posts_router
 from shared.http import router as upload_router
 from shared.upload import UPLOAD_DIR
+from demo import DEMO_DIR, seed_demo
 
 
 def get_app(database_url: str | None = None, redis_client=None) -> FastAPI:
@@ -35,6 +36,8 @@ def get_app(database_url: str | None = None, redis_client=None) -> FastAPI:
         try:
             await database.ping()
             await redis.ping()
+            if os.environ.get("VELO_SEED_DEMO", "0") == "1":
+                await seed_demo(database)
             yield
         finally:
             await container.close()
@@ -49,6 +52,7 @@ def get_app(database_url: str | None = None, redis_client=None) -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"],)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+    app.mount("/demo-assets", StaticFiles(directory=str(DEMO_DIR / "assets")), name="demo-assets")
     app.include_router(auth_router, prefix="/auth")
     app.include_router(posts_router)
     app.include_router(bikes_router)

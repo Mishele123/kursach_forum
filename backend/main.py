@@ -13,6 +13,7 @@ from community.routes import router as posts_router
 from auth.controllers import auth_router, register_exception_handlers
 from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import FastAPI
 from ioc import (
     AuthProvider,
@@ -68,6 +69,13 @@ def create_app() -> FastAPI:
     app.include_router(profile_router)
     app.include_router(bikes_router)
     setup_dishka(container, app)
+
+    Instrumentator(
+        should_group_status_codes=True,
+        should_ignore_untemplated=True,
+        excluded_handlers=["/metrics", "/docs", "/openapi.json"],
+    ).instrument(app).expose(app)
+    
     return app
 
 

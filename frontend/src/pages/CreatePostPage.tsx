@@ -1,200 +1,32 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { usePosts } from '../hooks';
-import { Button, Input, Textarea } from '../components/common';
-import { POST_CATEGORIES, CATEGORY_LABELS, ROUTES, MAX_POST_TITLE_LENGTH, MAX_POST_TEXT_LENGTH } from '../utils/constants';
+import { useEffect, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { postsApi, uploadPhoto, errorMessage } from '../services/api';
+import { Input, Button } from '../components/common';
+import { POST_CATEGORIES, CATEGORY_LABELS } from '../utils/constants';
 import type { PostCategory } from '../types';
-
-const CreatePostPage: React.FC = () => {
-  const [title, setTitle] = useState('');
-  const [text, setText] = useState('');
-  const [category, setCategory] = useState<PostCategory>('маршрут');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { createPost } = usePosts();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    // Validation
-    if (!title.trim()) {
-      setError('Пожалуйста, введите заголовок');
-      return;
-    }
-
-    if (!text.trim()) {
-      setError('Пожалуйста, введите текст публикации');
-      return;
-    }
-
-    if (title.length > MAX_POST_TITLE_LENGTH) {
-      setError(`Заголовок не должен превышать ${MAX_POST_TITLE_LENGTH} символов`);
-      return;
-    }
-
-    if (text.length > MAX_POST_TEXT_LENGTH) {
-      setError(`Текст не должен превышать ${MAX_POST_TEXT_LENGTH} символов`);
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await createPost({
-        title: title.trim(),
-        text: text.trim(),
-        category,
-        photo_url: photoUrl.trim() || undefined,
-      });
-
-      navigate(ROUTES.FEED);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Не удалось создать публикацию');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="py-8 px-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          Новая история
-        </h1>
-        <p className="text-gray-600 text-lg">
-          Поделитесь опытом с сообществом
-        </p>
-      </div>
-
-      {/* Helper Card */}
-      <div className="bg-velo-green-50 border border-velo-green-100 rounded-2xl p-6 mb-8">
-        <h3 className="font-bold text-gray-900 mb-3">О чём написать?</h3>
-        <p className="text-gray-700 text-sm leading-relaxed mb-3">
-          Расскажите о маршруте, ремонте, новом велосипеде или полезном трюке. 
-          Личный опыт помогает всему сообществу.
-        </p>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Будьте конкретны и делитесь деталями</li>
-          <li>• Добавьте фотографии для наглядности</li>
-          <li>• Выберите подходящую категорию</li>
-        </ul>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {/* Title */}
-          <div>
-            <Input
-              label="Заголовок *"
-              placeholder="Выходные на двух колёсах"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={isSubmitting}
-              maxLength={MAX_POST_TITLE_LENGTH}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {title.length} / {MAX_POST_TITLE_LENGTH}
-            </p>
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Категория *
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {POST_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`px-4 py-3 rounded-xl font-semibold transition-all ${
-                    category === cat
-                      ? 'bg-velo-green text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  disabled={isSubmitting}
-                >
-                  {CATEGORY_LABELS[cat]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Text */}
-          <div>
-            <Textarea
-              label="Текст публикации *"
-              placeholder="Утренний туман, лесные тропы и 42 километра свободы. Делюсь любимым маршрутом по Жигулям."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={isSubmitting}
-              rows={10}
-              maxLength={MAX_POST_TEXT_LENGTH}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {text.length} / {MAX_POST_TEXT_LENGTH}
-            </p>
-          </div>
-
-          {/* Photo URL (Optional) */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              + Добавьте одну фотографию
-            </h3>
-            <p className="text-sm text-gray-500 mb-3">
-              Выберите файл с устройства
-            </p>
-            <Input
-              placeholder="https://example.com/photo.jpg (или оставьте пустым)"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              disabled={isSubmitting}
-            />
-            <button
-              type="button"
-              className="mt-3 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-colors"
-              disabled={isSubmitting}
-            >
-              Выбрать фотографию
-            </button>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4 mt-8 pt-6 border-t border-gray-200">
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isSubmitting}
-            className="flex-1"
-          >
-            Опубликовать
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => navigate(ROUTES.FEED)}
-            disabled={isSubmitting}
-          >
-            Отмена
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-export default CreatePostPage;
+export default function CreatePostPage() {
+ const [title,setTitle] = useState(''); const [text,setText] = useState('');
+ const [category,setCategory] = useState<PostCategory>('маршрут');
+ const [photo,setPhoto] = useState<File | null>(null); const [preview,setPreview] = useState('');
+ const [busy,setBusy] = useState(false); const [error,setError] = useState('');
+ const textarea = useRef<HTMLTextAreaElement>(null); const fileInput=useRef<HTMLInputElement>(null); const navigate=useNavigate();
+ useEffect(() => { if(!photo) {setPreview('');return;} const url=URL.createObjectURL(photo);setPreview(url);return () => URL.revokeObjectURL(url); },[photo]);
+ function format(marker: string) {
+  const el=textarea.current; if(!el) return; const a=el.selectionStart,b=el.selectionEnd;
+  const next=text.slice(0,a)+marker+text.slice(a,b)+marker+text.slice(b);
+  if(next.length>5000) return; setText(next); requestAnimationFrame(() => {el.focus();el.setSelectionRange(a+marker.length,b+marker.length);});
+ }
+ async function submit(event: FormEvent) {
+  event.preventDefault(); setError(''); if(!title.trim() || !text.trim()) {setError('Введите заголовок и текст публикации');return;}
+  setBusy(true); try { const photo_url=photo ? await uploadPhoto(photo) : undefined; await postsApi.createPost({title:title.trim(),text:text.trim(),category,photo_url}); navigate('/feed'); } catch(err) {setError(errorMessage(err));} finally {setBusy(false);}
+ }
+ return <section className="velo-page"><h1>Создать публикацию</h1><p className="subtitle">Поделитесь историей, маршрутом или полезным опытом</p><form className="velo-card velo-form" onSubmit={submit}>
+ {error && <p role="alert" className="error">{error}</p>}
+ <Input label="Заголовок *" placeholder="Выходные на двух колёсах" value={title} onChange={e=>setTitle(e.target.value)} required maxLength={200} disabled={busy}/>
+ <fieldset disabled={busy}><legend>Категория *</legend><div className="category-tabs">{POST_CATEGORIES.map(c=><button key={c} type="button" aria-pressed={category===c} className={category===c?'selected':''} onClick={()=>setCategory(c)}>{CATEGORY_LABELS[c]}</button>)}</div></fieldset>
+ <div><label htmlFor="post-text">Текст публикации *</label><div className="format-toolbar"><button type="button" aria-label="Жирный текст" onClick={()=>format('**')} disabled={busy}><strong>B</strong></button><button type="button" aria-label="Курсив" onClick={()=>format('*')} disabled={busy}><em>I</em></button><span>Выделите текст для форматирования</span></div><textarea id="post-text" ref={textarea} rows={9} value={text} onChange={e=>setText(e.target.value)} required maxLength={5000} disabled={busy}/><small>{text.length} / 5000</small></div>
+ <div className="upload-area"><label htmlFor="post-photo">+ Добавьте одну фотографию</label><p>JPG, PNG, GIF, WEBP · до 5 МБ</p><input ref={fileInput} id="post-photo" type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file && (file.size>5*1024*1024 || !['image/jpeg','image/png','image/gif','image/webp'].includes(file.type))) {setError('Выберите изображение до 5 МБ');event.target.value='';setPhoto(null);return;}setError('');setPhoto(file||null);}}/>
+ {preview && <><img className="upload-preview" src={preview} alt="Предпросмотр фотографии"/><button type="button" disabled={busy} onClick={()=>{setPhoto(null);if(fileInput.current) fileInput.current.value='';}}>Убрать фотографию</button></>}</div>
+ <div className="form-actions"><Button type="submit" isLoading={busy}>Опубликовать</Button><Link className="velo-button secondary" to="/feed">Отмена</Link></div></form></section>;
+}

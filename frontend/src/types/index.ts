@@ -13,6 +13,7 @@ export interface User {
 }
 
 export interface CreateUserDto {
+  email: string;
   username: string;
   password: string;
 }
@@ -68,6 +69,6 @@ export interface CreateBikeDto {
 
 // Auth response
 export interface AuthResponse {
-  message: string;
+  access_token: string;
   user: User;
 }

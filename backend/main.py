@@ -1,113 +1,76 @@
-from collections.abc import AsyncIterator
+"""FastAPI application and lifecycle for PostgreSQL/Redis resources."""
+import os
 from contextlib import asynccontextmanager
 
-import uvicorn
-from auth.http import router as auth_router
-from posts.http import router as posts_router
-from bikes.http import router as bikes_router
-from shared.http import router as shared_router
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-from ioc import AuthProvider, PostProvider, BikeProvider
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+from sqlalchemy.exc import SQLAlchemyError
 
-container = make_async_container(AuthProvider(), PostProvider(), BikeProvider())
+from auth.http import router as auth_router
+from auth.session import SessionService
+from bikes.http import router as bikes_router
+from database import Database
+from ioc import AppProvider
+from posts.http import router as posts_router
+from shared.http import router as upload_router
+from shared.upload import UPLOAD_DIR
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    yield await app.state.dishka_container_close()
-
-
-def get_fastapi_app() -> FastAPI:
-    fastapi_app = FastAPI(
-        title="Cycling Social Network API",
-        description="Backend API for Sprint 1",
-        version="1.0.0"
+def get_app(database_url: str | None = None, redis_client=None) -> FastAPI:
+    database = Database(database_url)
+    redis = redis_client if redis_client is not None else Redis.from_url(
+        os.environ.get("REDIS_URL", "redis://localhost:16379/0"), decode_responses=True,
+        socket_connect_timeout=5, socket_timeout=5,
     )
-    
-    # Add CORS middleware
-    fastapi_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",  # Vite dev server
-            "http://127.0.0.1:5173",
-            "http://localhost:8000",
-            "http://127.0.0.1:8000",
-            "null"  # For file:// protocol
-        ],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # Create uploads directory if it doesn't exist
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(exist_ok=True)
-    
-    # Serve uploaded files statically
-    fastapi_app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-    
-    # Root endpoint
-    @fastapi_app.get("/", tags=["root"])
+    container = make_async_container(AppProvider(), context={Database: database})
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        try:
+            await database.ping()
+            await redis.ping()
+            yield
+        finally:
+            await container.close()
+            await redis.aclose()
+            await database.close()
+
+    app = FastAPI(title="velo. API", description="Сообщество велосипедистов — Спринт 1", version="1.0.0", lifespan=lifespan)
+    app.state.database = database
+    app.state.redis = redis
+    app.state.sessions = SessionService(database, redis)
+    origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"],)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+    app.include_router(auth_router, prefix="/auth")
+    app.include_router(posts_router)
+    app.include_router(bikes_router)
+    app.include_router(upload_router)
+    setup_dishka(container, app)
+
+    @app.exception_handler(RedisError)
+    @app.exception_handler(SQLAlchemyError)
+    async def infrastructure_unavailable(request: Request, error: Exception):
+        return JSONResponse(status_code=503, content={"detail": "Сервис временно недоступен. Попробуйте позже."})
+
+    @app.get("/health", tags=["system"])
+    async def health():
+        await database.ping()
+        await redis.ping()
+        return {"status": "ok", "database": "postgresql" if database.url.startswith("postgresql") else "test", "sessions": "redis"}
+
+    @app.get("/", tags=["system"])
     async def root():
-        """Welcome page with API information"""
-        return {
-            "message": "🚴 Welcome to Cycling Social Network API",
-            "version": "1.0.0",
-            "docs": "/docs",
-            "redoc": "/redoc",
-            "endpoints": {
-                "auth": {
-                    "register": "POST /auth/register",
-                    "login": "POST /auth/login",
-                    "profile": "GET /auth/me (requires token)",
-                    "update_profile": "PUT /auth/me (requires token)"
-                },
-                "posts": {
-                    "create": "POST /posts (requires token)",
-                    "list": "GET /posts",
-                    "detail": "GET /posts/{id}"
-                },
-                "bikes": {
-                    "add": "POST /bikes (requires token)",
-                    "my_bikes": "GET /bikes/my-bikes (requires token)"
-                },
-                "uploads": {
-                    "upload": "POST /uploads (requires token)",
-                    "info": "GET /uploads/info"
-                }
-            },
-            "authentication": {
-                "type": "Bearer JWT",
-                "header": "Authorization: Bearer <token>",
-                "get_token": "POST /auth/login with username and password"
-            }
-        }
-    
-    # Include all routers
-    fastapi_app.include_router(auth_router, prefix="/auth")
-    fastapi_app.include_router(posts_router)
-    fastapi_app.include_router(bikes_router)
-    fastapi_app.include_router(shared_router)
-    
-    setup_dishka(container, fastapi_app)
-    return fastapi_app
+        return {"name": "velo. API", "docs": "/docs", "health": "/health"}
+
+    return app
 
 
-def get_app() -> FastAPI:
-    fastapi_app = get_fastapi_app()
-    return fastapi_app
-
-
-# Create app instance for uvicorn
 app = get_app()
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, lifespan="on")

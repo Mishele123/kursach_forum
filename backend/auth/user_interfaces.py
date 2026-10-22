@@ -8,6 +8,9 @@ class UserRepository(ABC):
     async def read_all(self) -> list[User]: ...
 
     @abstractmethod
+    async def find_by_login(self, identity: str) -> User | None: ...
+
+    @abstractmethod
     async def read(self, id: int) -> User | None: ...
 
     @abstractmethod

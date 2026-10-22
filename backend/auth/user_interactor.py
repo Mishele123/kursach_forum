@@ -1,3 +1,4 @@
+from starlette.concurrency import run_in_threadpool
 """Business logic for user operations"""
 from auth.user_dto import CreateUserDto
 from auth.user_entity import User
@@ -22,15 +23,10 @@ class CreateUserInteractor:
             Created User entity with assigned ID
             
         Raises:
-            ValueError: If username already exists (TODO: implement check)
+            HTTPException 409: If username or email already exists
         """
-        # TODO: Check if username already exists
-        # existing_users = await self._repo.read_all()
-        # if any(user.username == dto.username for user in existing_users):
-        #     raise ValueError(f"Username '{dto.username}' already exists")
-        
         # Convert DTO to Entity
-        user = UserMapper.create_dto_to_entity(dto)
+        user = await run_in_threadpool(UserMapper.create_dto_to_entity, dto)
         
         # Persist to storage
         created_user = await self._repo.create(user)

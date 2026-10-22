@@ -1,8 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { MainLayout } from './components/layout';
-import { ProtectedRoute } from './components/auth';
+import { MainLayout } from './components/Layout';
+import { ProtectedRoute } from './components/Auth';
+import { BikesPage, AddBikePage } from './pages/BikesPage';
+import EditProfilePage from './pages/EditProfilePage';
+import PostDetailPage from './pages/PostDetailPage';
 import { ROUTES } from './utils/constants';
 
 // Pages
@@ -27,6 +30,9 @@ const App: React.FC = () => {
 
           {/* Routes with Layout */}
           <Route element={<MainLayout />}>
+            <Route path={ROUTES.EDIT_PROFILE} element={<ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
+            <Route path={ROUTES.ADD_BIKE} element={<ProtectedRoute><AddBikePage /></ProtectedRoute>} />
+            <Route path={ROUTES.POST_DETAIL} element={<PostDetailPage />} />
             {/* Public Feed */}
             <Route path={ROUTES.FEED} element={<FeedPage />} />
             <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.FEED} replace />} />
@@ -54,21 +60,7 @@ const App: React.FC = () => {
               path={ROUTES.MY_BIKES}
               element={
                 <ProtectedRoute>
-                  <div className="py-8 px-6">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">Мои велосипеды</h1>
-                    <p className="text-gray-600">Страница в разработке...</p>
-                  </div>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={ROUTES.SAVED}
-              element={
-                <ProtectedRoute>
-                  <div className="py-8 px-6">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">Сохранённое</h1>
-                    <p className="text-gray-600">Страница в разработке...</p>
-                  </div>
+                  <BikesPage />
                 </ProtectedRoute>
               }
             />

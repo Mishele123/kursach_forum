@@ -3,7 +3,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from pydantic import BaseModel
 
 from auth.dependencies import CurrentUserId
-from shared.upload import save_upload_file, get_file_url, MAX_FILE_SIZE, ALLOWED_EXTENSIONS
+from shared.upload import save_upload_file, MAX_FILE_SIZE, ALLOWED_EXTENSIONS
 
 
 router = APIRouter(tags=["uploads"])
@@ -63,10 +63,10 @@ async def upload_file(
     file.file.seek(0)
     
     # Save file (includes validation)
-    file_path = await save_upload_file(file)
+    file_path = await save_upload_file(file, user_id=user_id)
     
     # Generate public URL
-    file_url = get_file_url(file_path)
+    file_url = "/" + file_path
     
     return UploadResponse(
         filename=file.filename,

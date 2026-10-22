@@ -1,14 +1,15 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 
 from posts.post_entity import PostCategory
 
 
 class CreatePostDto(BaseModel):
     """DTO for creating a post (US3)"""
-    title: str
-    text: str
+    model_config = ConfigDict(str_strip_whitespace=True)
+    title: str = Field(..., min_length=1, max_length=200)
+    text: str = Field(..., min_length=1, max_length=5000)
     category: PostCategory
     photo_url: str | None = None  # Optional photo
 

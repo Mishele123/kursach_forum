@@ -29,9 +29,9 @@ class UserMapper:
         
         return User(
             id=0,  # Will be assigned by storage
-            username=dto.username,
+            username=dto.username.strip(),
             password_hash=hash_password(dto.password),  # Hash password with Argon2
-            email=None,
+            email=dto.email,
             role=UserRole.USER,
             avatar_url=None,
             bio=None,

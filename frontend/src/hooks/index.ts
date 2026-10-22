@@ -1,2 +1,2 @@
-export { usePosts, usePost } from './usePosts';
+export { usePost } from './usePost';
 export { useBikes } from './useBikes';

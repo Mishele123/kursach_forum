@@ -1,6 +1,10 @@
 """File upload utilities and validation"""
 import os
 import uuid
+import io
+import warnings
+from PIL import Image, UnidentifiedImageError
+from starlette.concurrency import run_in_threadpool
 from pathlib import Path
 from typing import Optional
 
@@ -8,7 +12,7 @@ from fastapi import UploadFile, HTTPException, status
 
 
 # Configuration
-UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR = Path(os.environ.get("VELO_UPLOAD_DIR", str(Path(__file__).resolve().parents[2] / "uploads")))
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB in bytes
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 ALLOWED_CONTENT_TYPES = {
@@ -37,7 +41,7 @@ def validate_file_size(file: UploadFile, max_size: int = MAX_FILE_SIZE) -> None:
     
     if file_size > max_size:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"File size {file_size / 1024 / 1024:.2f}MB exceeds maximum allowed size {max_size / 1024 / 1024:.0f}MB"
         )
 
@@ -99,7 +103,7 @@ def generate_unique_filename(original_filename: str) -> str:
     return f"{unique_id}{ext}"
 
 
-async def save_upload_file(file: UploadFile, upload_dir: Path = UPLOAD_DIR) -> str:
+async def save_upload_file(file: UploadFile, upload_dir: Path = UPLOAD_DIR, user_id: int = 0) -> str:
     """
     Save uploaded file to disk and return its path.
     
@@ -122,14 +126,41 @@ async def save_upload_file(file: UploadFile, upload_dir: Path = UPLOAD_DIR) -> s
     upload_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate unique filename
-    unique_filename = generate_unique_filename(file.filename or "upload.jpg")
+    unique_filename = f"{user_id}_" + generate_unique_filename(file.filename or "upload.jpg")
     file_path = upload_dir / unique_filename
     
     # Save file
     try:
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
+        contents = await file.read(MAX_FILE_SIZE + 1)
+        if not contents:
+            raise HTTPException(400, "Empty image file")
+        ext = Path(file.filename or "").suffix.lower()
+        expected_mime = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp"}
+        if file.content_type != expected_mime.get(ext):
+            raise HTTPException(400, "Image extension and MIME type must match")
+        signatures = {
+            ".jpg": contents.startswith(b"\xff\xd8\xff"),
+            ".jpeg": contents.startswith(b"\xff\xd8\xff"),
+            ".png": contents.startswith(b"\x89PNG\r\n\x1a\n"),
+            ".gif": contents.startswith((b"GIF87a", b"GIF89a")),
+            ".webp": contents.startswith(b"RIFF") and contents[8:12] == b"WEBP",
+        }
+        if not signatures.get(ext):
+            raise HTTPException(400, "File contents do not match the image format")
+        def validate_and_save():
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", Image.DecompressionBombWarning)
+                    with Image.open(io.BytesIO(contents)) as image:
+                        if image.format not in {"JPEG", "PNG", "GIF", "WEBP"}:
+                            raise ValueError("Unsupported image")
+                        image.verify()
+            except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+                raise HTTPException(400, "Файл повреждён или не является допустимым изображением") from error
+            file_path.write_bytes(contents)
+        await run_in_threadpool(validate_and_save)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -139,41 +170,4 @@ async def save_upload_file(file: UploadFile, upload_dir: Path = UPLOAD_DIR) -> s
         await file.close()
     
     # Return relative path for storage in database
-    return str(file_path)
-
-
-def delete_file(file_path: str) -> bool:
-    """
-    Delete a file from disk.
-    
-    Args:
-        file_path: Path to the file to delete
-        
-    Returns:
-        True if deleted, False if file doesn't exist
-    """
-    try:
-        Path(file_path).unlink(missing_ok=True)
-        return True
-    except Exception:
-        return False
-
-
-def get_file_url(file_path: str, base_url: str = "http://localhost:8000") -> str:
-    """
-    Convert file path to public URL.
-    
-    Args:
-        file_path: Relative file path (e.g., "uploads/uuid.jpg")
-        base_url: Base URL of the API
-        
-    Returns:
-        Full URL to access the file
-        
-    Example:
-        >>> get_file_url("uploads/abc123.jpg")
-        'http://localhost:8000/uploads/abc123.jpg'
-    """
-    # Normalize path separators to forward slashes for URLs
-    normalized_path = file_path.replace("\\", "/")
-    return f"{base_url}/{normalized_path}"
+    return f"uploads/{unique_filename}"

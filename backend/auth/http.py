@@ -1,9 +1,12 @@
+from starlette.concurrency import run_in_threadpool
 """HTTP endpoints for user authentication and profile management"""
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Response, Request
+import os
+from datetime import datetime, timezone
 
-from auth.dependencies import CurrentUser, CurrentUserId
-from auth.jwt import create_access_token
+from auth.dependencies import CurrentUserId
+from auth.session import SESSION_SECONDS
 from auth.password import verify_password
 from auth.user_dto import CreateUserDto, LoginDto, UserResponseDto, UpdateUserDto
 from auth.user_interactor import CreateUserInteractor
@@ -26,15 +29,15 @@ async def register_user(
 ) -> UserResponseDto:
     """
     Register a new user account.
-    
+
     - **username**: Unique username (min 3 chars)
     - **password**: Password (min 6 chars, will be hashed)
-    
+
     Returns user info without password.
     """
     # Create user via interactor (handles business logic)
     created_user = await interactor(dto)
-    
+
     # Convert Entity to safe ResponseDTO
     return UserMapper.entity_to_response_dto(created_user)
 
@@ -43,40 +46,48 @@ async def register_user(
     path="/login",
     response_model=dict,
     summary="User login",
-    description="Authenticate user with username and password, returns JWT token (US1)"
+    description="Authenticate user with username and password, returns session token (US1)"
 )
 async def login_user(
     dto: LoginDto,
+    response: Response,
+    request: Request,
     repo: FromDishka[UserRepository]
 ) -> dict:
     """
     Login with username and password.
-    
+
     - **username**: Your username
     - **password**: Your password
-    
-    Returns JWT access token and user info.
+
+    Returns session access token and user info.
     """
-    # Find user by username
-    all_users = await repo.read_all()
-    user = next((u for u in all_users if u.username == dto.username), None)
-    
+    user = await repo.find_by_login(dto.email or dto.username)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
-    
+
     # Verify password using Argon2
-    if not verify_password(dto.password, user.password_hash):
+    if not await run_in_threadpool(verify_password, dto.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
-    
-    # Create JWT access token
-    access_token = create_access_token(user_id=user.id, username=user.username)
-    
+
+    if user.is_banned:
+        raise HTTPException(403, "User account is banned")
+
+    user.last_login_at = datetime.now(timezone.utc)
+    await repo.update(user)
+
+    # Create login session
+    access_token = await request.app.state.sessions.create_access_token(user.id)
+
+    response.set_cookie("velo_session", access_token, httponly=True, secure=os.environ.get("VELO_COOKIE_SECURE") == "1", samesite="lax", max_age=SESSION_SECONDS)
+
     # Return token and user info
     return {
         "access_token": access_token,
@@ -91,15 +102,24 @@ async def login_user(
     summary="Get current user profile",
     description="Retrieve current authenticated user's profile information (US2)"
 )
-async def get_current_user(
-    current_user: CurrentUser
+async def get_current_user_profile(
+    user_id: CurrentUserId,
+    repo: FromDishka[UserRepository]
 ) -> UserResponseDto:
     """
     Get current user's profile.
-    
+
     Requires: Bearer token in Authorization header
     """
-    return UserMapper.entity_to_response_dto(current_user)
+    user = await repo.read(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+
+    return UserMapper.entity_to_response_dto(user)
 
 
 @router.put(
@@ -110,21 +130,39 @@ async def get_current_user(
 )
 async def update_profile(
     dto: UpdateUserDto,
-    current_user: CurrentUser,
+    user_id: CurrentUserId,
     repo: FromDishka[UserRepository]
 ) -> UserResponseDto:
     """
     Update current user's profile (partial update).
-    
+
     Only provided fields will be updated. Null/None values are ignored.
-    
+
     Requires: Bearer token in Authorization header
     """
-    # Apply updates from DTO to current user entity
-    updated_user = UserMapper.update_entity_from_dto(current_user, dto)
-    
+    # Retrieve existing user
+    user = await repo.read(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+
+    # Apply updates from DTO
+    updated_user = UserMapper.update_entity_from_dto(user, dto)
+
     # Persist changes
     await repo.update(updated_user)
-    
+
     # Return updated user info
     return UserMapper.entity_to_response_dto(updated_user)
+
+
+@router.post("/logout", status_code=204)
+async def logout(request: Request, response: Response):
+    tokens = [request.cookies.get("velo_session", ""), request.headers.get("authorization", "").removeprefix("Bearer ")]
+    for token in tokens:
+        if token:
+            await request.app.state.sessions.revoke_token(token)
+    response.delete_cookie("velo_session")

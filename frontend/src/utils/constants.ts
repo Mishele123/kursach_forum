@@ -2,9 +2,9 @@ import type { PostCategory } from '../types';
 
 // Categories
 export const POST_CATEGORIES: PostCategory[] = [
+  'маршрут',
   'обслуживание',
   'апгрейд',
-  'маршрут',
   'трюки',
 ];
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -13,14 +13,15 @@ const Input: React.FC<InputProps> = ({
   className = '',
   ...props
 }) => {
+  const id = useId();
   return (
     <div className={`${fullWidth ? 'w-full' : ''}`}>
       {label && (
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
+        <label htmlFor={props.id || id} className="block text-sm font-semibold text-gray-700 mb-2">
           {label}
         </label>
       )}
-      <input
+      <input id={props.id || id}
         className={`input w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-velo-green focus:border-transparent transition-all ${
           error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
         } ${className}`}

@@ -1,28 +1,28 @@
+from sqlalchemy import select
+
+from database import Database
+from models import BikeRow
 from bikes.bike_entity import Bike
 
 
 class BikeStorage:
-    """In-memory storage for bikes"""
-    
-    def __init__(self):
-        self.bikes: list[Bike] = []
-        self._next_id = 1
-    
-    async def create(self, bike: Bike) -> Bike:
-        """Create a new bike"""
-        if bike.id == 0:
-            bike.id = self._next_id
-            self._next_id += 1
-        self.bikes.append(bike)
-        return bike
-    
-    async def get_by_user(self, user_id: int) -> list[Bike]:
-        """Get all bikes for a user (US5)"""
-        return [b for b in self.bikes if b.user_id == user_id]
-    
+    def __init__(self, database: Database):
+        self.database = database
+
+    async def create(self, entity: Bike) -> Bike:
+        async with self.database.session() as session:
+            row = BikeRow(**entity.model_dump(exclude={"id"}))
+            session.add(row)
+            await session.flush()
+            entity.id = row.id
+        return entity
+
     async def get_by_id(self, bike_id: int) -> Bike | None:
-        """Get bike by ID"""
-        for bike in self.bikes:
-            if bike.id == bike_id:
-                return bike
-        return None
+        async with self.database.session() as session:
+            row = await session.get(BikeRow, bike_id)
+            return Bike.model_validate(row, from_attributes=True) if row else None
+
+    async def get_by_user(self, user_id: int) -> list[Bike]:
+        async with self.database.session() as session:
+            rows = (await session.scalars(select(BikeRow).where(BikeRow.user_id == user_id).order_by(BikeRow.id.desc()))).all()
+            return [Bike.model_validate(row, from_attributes=True) for row in rows]

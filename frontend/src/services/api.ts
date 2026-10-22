@@ -11,10 +11,11 @@ import type {
   CreateBikeDto
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,22 +24,22 @@ const api = axios.create({
 // Auth API
 export const authApi = {
   register: async (data: CreateUserDto): Promise<User> => {
-    const response = await api.post<User>('/register', data);
+    const response = await api.post<User>('/auth/register', data);
     return response.data;
   },
 
   login: async (data: LoginDto): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/login', data);
+    const response = await api.post<AuthResponse>('/auth/login', data);
     return response.data;
   },
 
   getCurrentUser: async (): Promise<User> => {
-    const response = await api.get<User>('/me');
+    const response = await api.get<User>('/auth/me');
     return response.data;
   },
 
   updateProfile: async (data: UpdateUserDto): Promise<User> => {
-    const response = await api.put<User>('/me', data);
+    const response = await api.put<User>('/auth/me', data);
     return response.data;
   },
 };
@@ -77,3 +78,19 @@ export const bikesApi = {
 };
 
 export default api;
+
+export function errorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map(item => item.msg).join('; ');
+  }
+  return 'Не удалось выполнить запрос. Проверьте подключение и попробуйте снова.';
+}
+
+export const uploadPhoto = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  return data.url;
+};

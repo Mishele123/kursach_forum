@@ -1,8 +1,8 @@
 # Frontend
 
 This frontend targets the backend API on `main` at commit `e927ccc`.
-All tracked files outside `frontend/` have been synchronized with this main
-revision, including backend code, migrations, configuration and API tests.
+Backend code matches this main revision. The root `docker-compose.yaml` also
+includes the frontend service so the application can be started with one file.
 
 Start the main backend separately using its README, then run from this directory:
 
@@ -49,11 +49,10 @@ profile edits, bike creation, text/photo posts and failed photo upload retries.
 It does not connect to a backend or change a database. Live integration with the
 main backend remains a separate check.
 
-To run the frontend container alongside main's Compose services without editing
-the backend Compose file, run from the repository root:
+To run the frontend container alongside the backend, run from the repository root:
 
 ```powershell
-docker compose -f docker-compose.yaml -f frontend/compose.yaml up -d --build
+docker compose up -d --build
 ```
 
 Configure the root `.env` according to main's `.env.example` first. Run the

@@ -2,18 +2,18 @@ import type { PostCategory } from '../types';
 
 // Categories
 export const POST_CATEGORIES: PostCategory[] = [
-  'маршрут',
-  'обслуживание',
-  'апгрейд',
-  'трюки',
+  'route',
+  'maintenance',
+  'upgrade',
+  'tricks',
 ];
 
 // Category labels for display
 export const CATEGORY_LABELS: Record<PostCategory, string> = {
-  'обслуживание': 'Обслуживание',
-  'апгрейд': 'Апгрейд',
-  'маршрут': 'Маршруты',
-  'трюки': 'Трюки',
+  'maintenance': 'Обслуживание',
+  'upgrade': 'Апгрейд',
+  'route': 'Маршруты',
+  'tricks': 'Трюки',
 };
 
 // Routes

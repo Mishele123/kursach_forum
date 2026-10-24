@@ -1,80 +1,82 @@
-"""FastAPI application and lifecycle for PostgreSQL/Redis resources."""
 import os
+from pathlib import Path
+from starlette.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
+from config import WebConfig
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from dishka import make_async_container
-from dishka.integrations.fastapi import setup_dishka
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
-from sqlalchemy.exc import SQLAlchemyError
-
-from auth.http import router as auth_router
-from auth.session import SessionService
-from bikes.http import router as bikes_router
-from database import Database
-from ioc import AppProvider
-from posts.http import router as posts_router
-from shared.http import router as upload_router
-from shared.upload import UPLOAD_DIR
-from demo import DEMO_DIR, seed_demo
+from community.bikes import router as bikes_router
+from community.profile import router as profile_router
+from community.routes import router as posts_router
+from auth.controllers import auth_router, register_exception_handlers
+from dishka import AsyncContainer, make_async_container
+from dishka.integrations.fastapi import FastapiProvider, setup_dishka
+from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi import FastAPI
+from ioc import (
+    AuthProvider,
+    ConfigProvider,
+    PostgresProvider,
+    RedisProvider,
+    RepoProvider,
+)
 
 
-def get_app(database_url: str | None = None, redis_client=None) -> FastAPI:
-    database = Database(database_url)
-    redis = redis_client if redis_client is not None else Redis.from_url(
-        os.environ.get("REDIS_URL", "redis://localhost:16379/0"), decode_responses=True,
-        socket_connect_timeout=5, socket_timeout=5,
+def create_container() -> AsyncContainer:
+    return make_async_container(
+        ConfigProvider(),
+        PostgresProvider(),
+        RedisProvider(),
+        RepoProvider(),
+        AuthProvider(),
+        FastapiProvider(),
     )
-    container = make_async_container(AppProvider(), context={Database: database})
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        try:
-            await database.ping()
-            await redis.ping()
-            if os.environ.get("VELO_SEED_DEMO", "0") == "1":
-                await seed_demo(database)
-            yield
-        finally:
-            await container.close()
-            await redis.aclose()
-            await database.close()
 
-    app = FastAPI(title="velo. API", description="Сообщество велосипедистов — Спринт 1", version="1.0.0", lifespan=lifespan)
-    app.state.database = database
-    app.state.redis = redis
-    app.state.sessions = SessionService(database, redis)
-    origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-    app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"],)
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-    app.mount("/demo-assets", StaticFiles(directory=str(DEMO_DIR / "assets")), name="demo-assets")
-    app.include_router(auth_router, prefix="/auth")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await app.state.dishka_container.close()
+
+
+def create_app() -> FastAPI:
+    container: AsyncContainer = create_container()
+    app: FastAPI = FastAPI(lifespan=lifespan)
+    web = WebConfig()
+    app.state.web_config = web
+
+    @app.middleware("http")
+    async def check_origin(request, call_next):
+        origin = request.headers.get("origin")
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and origin:
+            own_origin = str(request.base_url).rstrip("/")
+            if origin not in {*web.allowed_origins, own_origin}:
+                return JSONResponse({"detail": "Недопустимый источник запроса"}, status_code=403)
+        return await call_next(request)
+
+    app.add_middleware(CORSMiddleware, allow_origins=web.allowed_origins,
+                       allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "PUT"],
+                       allow_headers=["Content-Type"])
+    upload_dir = Path(os.environ.get("UPLOAD_DIR", str(Path(__file__).resolve().parent.parent / "uploads")))
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    app.state.upload_dir = upload_dir
+    app.mount("/media", StaticFiles(directory=upload_dir), name="media")
+    register_exception_handlers(app)
+    app.include_router(auth_router)
     app.include_router(posts_router)
+    app.include_router(profile_router)
     app.include_router(bikes_router)
-    app.include_router(upload_router)
     setup_dishka(container, app)
 
-    @app.exception_handler(RedisError)
-    @app.exception_handler(SQLAlchemyError)
-    async def infrastructure_unavailable(request: Request, error: Exception):
-        return JSONResponse(status_code=503, content={"detail": "Сервис временно недоступен. Попробуйте позже."})
-
-    @app.get("/health", tags=["system"])
-    async def health():
-        await database.ping()
-        await redis.ping()
-        return {"status": "ok", "database": "postgresql" if database.url.startswith("postgresql") else "test", "sessions": "redis"}
-
-    @app.get("/", tags=["system"])
-    async def root():
-        return {"name": "velo. API", "docs": "/docs", "health": "/health"}
-
+    Instrumentator(
+        should_group_status_codes=True,
+        should_ignore_untemplated=True,
+        excluded_handlers=["/metrics", "/docs", "/openapi.json"],
+    ).instrument(app).expose(app)
+    
     return app
 
 
-app = get_app()
+app: FastAPI = create_app()

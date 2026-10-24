@@ -157,6 +157,7 @@ hr{border:0;border-top:1px solid #dfe5dc;margin:24px 0}
 
 
 fieldset{border:0;padding:0;margin:0;min-width:0}
+.auth-form input[type=checkbox]{width:16px;min-height:16px;margin-right:8px;accent-color:#246b50}
 legend,.velo-form label{font-weight:600;font-size:12px}
 .velo-form textarea{display:block;width:100%;padding:14px;resize:vertical}
 .velo-form small{color:#7e8981;font-size:11px}

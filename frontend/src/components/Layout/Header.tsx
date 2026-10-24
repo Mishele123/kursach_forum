@@ -6,9 +6,9 @@ export default function Header() {
   const navigate = useNavigate();
   return <header className="velo-header">
     <Link className="logo" to="/feed">velo.</Link>
-    <form className="header-search" onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); navigate('/feed?q=' + encodeURIComponent(String(data.get('q') || ''))); }}><input name="q" aria-label="Поиск историй" placeholder="Поиск людей, велосипедов и историй" /></form>
+    <form className="header-search" onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); navigate('/feed?q=' + encodeURIComponent(String(data.get('q') || ''))); }}><input name="q" aria-label="Поиск историй" placeholder="Поиск в загруженных публикациях" /></form>
     <span className="header-tagline">Сообщество велосипедистов</span>
     <Link className="velo-button" to={user ? '/post/create' : '/login'}>{user ? '+ Создать пост' : 'Войти'}</Link>
-    {user && <Link className="avatar" aria-label="Мой профиль" to="/profile"><AvatarImage username={user.username} url={user.avatar_url} /></Link>}
+    {user && <Link className="avatar" aria-label="Мой профиль" to="/profile"><AvatarImage username={user.username}  /></Link>}
   </header>;
 }

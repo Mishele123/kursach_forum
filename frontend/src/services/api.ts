@@ -1,96 +1,32 @@
 import axios from 'axios';
-import type { 
-  User, 
-  CreateUserDto, 
-  LoginDto, 
-  UpdateUserDto,
-  AuthResponse,
-  Post,
-  CreatePostDto,
-  Bike,
-  CreateBikeDto
-} from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Auth API
+import type { User, CreateUserDto, LoginDto, UpdateUserDto, AuthResponse, Post, CreatePostDto, Bike, CreateBikeDto, FeedResponse } from '../types';
+const baseURL = import.meta.env.VITE_API_URL || '/api';
+const api = axios.create({ baseURL, withCredentials: true });
 export const authApi = {
-  register: async (data: CreateUserDto): Promise<User> => {
-    const response = await api.post<User>('/auth/register', data);
-    return response.data;
-  },
-
-  login: async (data: LoginDto): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/login', data);
-    return response.data;
-  },
-
-  getCurrentUser: async (): Promise<User> => {
-    const response = await api.get<User>('/auth/me');
-    return response.data;
-  },
-
-  updateProfile: async (data: UpdateUserDto): Promise<User> => {
-    const response = await api.put<User>('/auth/me', data);
-    return response.data;
-  },
+ register: async (data: CreateUserDto) => (await api.post<{username:string}>('/auth/register',data)).data,
+ login: async (data: LoginDto) => (await api.post<AuthResponse>('/auth/login',data)).data,
+ getCurrentUser: async () => (await api.get<User>('/auth/me')).data,
+ updateProfile: async (data: UpdateUserDto) => (await api.patch<User>('/users/me',data)).data,
 };
-
-// Posts API
 export const postsApi = {
-  getPosts: async (limit: number = 20, offset: number = 0): Promise<Post[]> => {
-    const response = await api.get<Post[]>('/posts', {
-      params: { limit, offset },
-    });
-    return response.data;
-  },
-
-  getPost: async (postId: number): Promise<Post> => {
-    const response = await api.get<Post>(`/posts/${postId}`);
-    return response.data;
-  },
-
-  createPost: async (data: CreatePostDto): Promise<Post> => {
-    const response = await api.post<Post>('/posts', data);
-    return response.data;
-  },
+ getPosts: async (limit=10, cursor?: string) => (await api.get<FeedResponse>('/posts',{params:{limit,cursor}})).data,
+ getPost: async (id:number) => (await api.get<Post>(`/posts/${id}`)).data,
+ createPost: async (data:CreatePostDto) => (await api.post<Post>('/posts',data)).data,
+ uploadPhoto: async (id:number,file:File) => { const form=new FormData(); form.append('file',file); return (await api.put<Post>(`/posts/${id}/photo`,form)).data; },
 };
-
-// Bikes API
 export const bikesApi = {
-  getMyBikes: async (): Promise<Bike[]> => {
-    const response = await api.get<Bike[]>('/bikes/my-bikes');
-    return response.data;
-  },
-
-  createBike: async (data: CreateBikeDto): Promise<Bike> => {
-    const response = await api.post<Bike>('/bikes', data);
-    return response.data;
-  },
+ getMyBikes: async () => (await api.get<Bike[]>('/users/me/bikes')).data,
+ createBike: async (data:CreateBikeDto) => (await api.post<Bike>('/users/me/bikes',data)).data,
 };
-
-export default api;
-
-export function errorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const detail = error.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-    if (Array.isArray(detail)) return detail.map(item => item.msg).join('; ');
-  }
-  return 'Не удалось выполнить запрос. Проверьте подключение и попробуйте снова.';
+export function mediaUrl(path:string):string {
+ if (/^https?:\/\//i.test(baseURL)) return new URL(path,baseURL).href;
+ return path;
 }
-
-export const uploadPhoto = async (file: File): Promise<string> => {
-  const form = new FormData();
-  form.append('file', file);
-  const { data } = await api.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  return data.url;
-};
+export function errorMessage(error:unknown):string {
+ if(axios.isAxiosError(error)) { const detail=error.response?.data?.detail;
+ if(typeof detail==='string') return detail;
+ if(Array.isArray(detail)) return detail.map(item=>item.msg).join('; ');
+ }
+ return 'Не удалось выполнить запрос. Проверьте подключение и попробуйте снова.';
+}
+export default api;

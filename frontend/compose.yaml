@@ -1,0 +1,12 @@
+# Paths are relative to the first Compose file, at the repository root.
+services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app_network

@@ -1,130 +1,96 @@
-# velo. — Сообщество велосипедистов
+# Социальная сеть для велосипедистов
 
-React/TypeScript + FastAPI, PostgreSQL, Redis, SQLAlchemy, Alembic, Dishka и Nginx.
+Бэкенд первого спринта: публикации и лента, фотографии, вход по email, профиль и велосипеды.
 
-Реализованы регистрация и вход по email, Redis-сессии, редактирование профиля и
-имени пользователя, аватар, публикации с фото и форматированием, поиск и категории
-в ленте, гараж с фотографиями велосипедов. Интерфейс адаптирован для телефонов.
+## Локальный запуск на macOS
 
-## Запуск после клонирования или git pull
+Нужны Python 3.14 и запущенный Docker Desktop. Команды выполняются из корня проекта.
 
-Запустите Docker Desktop с Linux-контейнерами. Из корня репозитория:
-
-```powershell
-git pull
-docker compose up -d --build
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-- Сайт: http://localhost:8080
-- Swagger API: http://localhost:8001/docs
-- Проверка PostgreSQL/Redis: http://localhost:8080/api/health
+Если `.env` ещё нет, скопируйте `.env.example` в `.env`. Укажите собственные
+`POSTGRES_PASSWORD` и `REDIS_PASSWORD`. Для запуска Python на компьютере оставьте
+хосты `localhost`. `.env` и `.venv` исключены из Git.
+Если порт 5432 уже занят другим PostgreSQL, задайте `POSTGRES_PORT=55432`
+в `.env`: этот порт используют и Compose, и локальный Python.
 
-Backend автоматически применяет миграции и добавляет недостающие примеры.
-Создайте собственный аккаунт через интерфейс.
+```bash
+# Добавить утилиты Docker Desktop в PATH текущего терминала
+export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
-## Демонстрационные публикации
-
-В `demo_data/posts.json` сохранены пять опубликованных примеров; фотографии лежат
-в `demo_data/assets/`. Эти файлы входят в Git и Docker-образ, поэтому после
-запуска на другом компьютере будут видны те же посты с фото, без внешних ссылок.
-
-Импорт включён в Compose через `VELO_SEED_DEMO=1`. Повторный запуск не создаёт
-дубликаты. Оригинальные публикации с тем же содержимым пропускаются. Настоящие
-аккаунты и изменённые демонстрационные записи не перезаписываются. Если имя
-занято, создаётся отдельное имя с суффиксом. Демо-аккаунты не предназначены для
-входа: случайные пароли и отключённый вход. Настоящие email, пароли и сессии
-не экспортируются.
-
-Для отключения импорта задайте `VELO_SEED_DEMO=0` в корневом `.env` и пересоздайте
-backend. Это не удаляет уже добавленные записи. Новые пользовательские посты
-остаются в локальной базе; Git не синхронизирует базы участников команды.
-
-## Данные и остановка
-
-```powershell
-docker compose down
-docker compose up -d
+docker compose up -d --wait postgres redis
+(cd backend && ../.venv/bin/alembic upgrade head)
+python -m uvicorn main:app --app-dir backend --reload
 ```
 
-PostgreSQL/Redis сохраняются в Docker volumes, пользовательские фото — в
-`uploads/`. Не используйте `down -v` и не удаляйте `uploads/`, если нужны данные.
-Эти данные и локальные `.env` исключены из Git.
+Документация API: http://127.0.0.1:8000/docs.
 
-## Миграции
+В Swagger выполните `POST /auth/register` с именем (3–50 символов: латиница,
+цифры или `_`), email и паролем (8–128 символов). Затем выполните `POST /auth/login`
+с email, паролем и `remember_me: true` (без поля username). Успешные ответы: 201 и 200.
+Вход устанавливает cookie `session_id`; сессия хранится в Redis.
 
-Единая последовательность в `migrations/versions`:
+Повторная регистрация имени должна вернуть 409, неверный пароль при входе — 401.
 
-1. `0001_sprint1` — пользователи, публикации, велосипеды.
-2. `0002_bike_photo` — необязательное поле фотографии велосипеда.
-3. `0003_demo_keys` — уникальные необязательные маркеры демонстрационных записей.
+## Полностью в Docker
 
-Новые версии добавляют поля и не удаляют существующие записи. Импорт примеров
-в `backend/demo.py` отделён от миграций структуры.
+После настройки `.env`:
 
-```powershell
-docker compose exec backend python -m alembic current
-docker compose exec backend python -m alembic heads
-docker compose exec backend python -m alembic check
-docker compose exec backend python scripts/verify_migrations.py
+```bash
+docker compose up -d --wait postgres redis
+docker compose build backend
+docker compose run --rm backend alembic upgrade head
+docker compose up -d backend
+docker compose exec backend python seed.py
 ```
 
-Последняя команда проверяет upgrade, повторный upgrade, downgrade/upgrade,
-сохранение записей и импорт примеров на отдельной временной PostgreSQL-базе.
-После проверки удаляется только временная база; основная `velo` не изменяется.
-Откат миграции удаляет соответствующие поля, а `downgrade base` удаляет таблицы.
-Проверяйте откаты только на временной базе.
+Compose задаёт адреса `postgres` и `redis` для бэкенда внутри контейнера.
+Не запускайте одновременно локальный сервер и контейнер бэкенда на порту 8000.
 
-## Проверки
+## Полезные команды
 
-```powershell
-docker compose --profile test run --rm --build tests
+```bash
+docker compose ps
+(cd backend && ../.venv/bin/alembic current)
+docker compose logs --tail=50 postgres redis
 ```
 
-API-тесты используют только `velo_test` и Redis DB 15. Без тестовых переменных
-локальный unittest использует временную SQLite и FakeRedis.
+Локальный сервер останавливается через Ctrl+C, контейнеры — `docker compose stop`.
+Данные базы сохраняются в Docker-томе. Изменение пароля PostgreSQL в `.env`
+после первого запуска не меняет пароль в существующей базе.
 
-Для браузерной проверки в Windows с установленным Microsoft Edge:
+Миграции создают пользователей, посты, поля профиля и велосипеды. Фотографии
+хранятся в `uploads/` локально и в отдельном томе при запуске в Docker.
+Cookie по умолчанию настроена для локальной разработки по HTTP.
 
-```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe scripts/verify_ui.py
+## API и первый спринт
+
+- [Контракт API для фронтенда](docs/API.md): запросы, поля, cookie, ошибки и фотографии.
+- [Состояние серверной части спринта](docs/SPRINT_1_BACKEND.md): реализованный объём и сценарий демо.
+
+## Интеграционные тесты
+
+Нужны запущенные PostgreSQL и Redis, а также `.env` для локального подключения.
+
+```bash
+python -m pip install -r requirements-dev.txt
+python tests/run.py
 ```
 
-Desktop 1440px и mobile 390px: регистрация, смена имени, аватар, велосипед с фото,
-пост с фото, вход, перезагрузка и выход. Скрипт удаляет только свои аккаунты и
-файлы. Его `DATABASE_URL` должен указывать на ту же локальную базу, что и сервер.
-В Linux установите Chromium: `python -m playwright install --with-deps chromium`.
-Канал выбирается через `PLAYWRIGHT_CHANNEL`; результаты — в `test-results/`.
+Тесты используют временную отдельную базу и отдельные ключи Redis, после чего
+удаляют свои данные. Не запускайте их против внешней базы: тестовый runner
+рассчитан на сервисы текущего Docker Compose.
 
-## Локальная разработка
+После получения новых коммитов обновите зависимости и примените миграции:
 
-Python 3.14, Node.js 24. PostgreSQL: localhost:15432, Redis: localhost:16379.
-Настройки по умолчанию — в `.env.example`.
-
-```powershell
-docker compose up -d postgres redis
-.venv\Scripts\python.exe -m alembic upgrade head
-$env:VELO_SEED_DEMO = "1"
-.venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --reload --port 8000
+```bash
+python -m pip install -r requirements.txt
+(cd backend && ../.venv/bin/alembic upgrade head)
 ```
 
-В другом терминале:
-
-```powershell
-cd frontend
-npm ci
-npm run dev
-```
-
-Сайт: http://localhost:3000. Vite проксирует `/api`, `/uploads`, `/demo-assets` на
-порт 8000. В `frontend/.env` используйте `VITE_API_URL=/api` либо удалите старую
-настройку прямого URL. Не смешивайте localhost и 127.0.0.1 в одной сессии.
-Проверка сборки: `npm run build`.
-
-Compose читает корневой `.env`, Python получает настройки из окружения:
-`DATABASE_URL`, `REDIS_URL`, `VELO_UPLOAD_DIR`, `CORS_ORIGINS`, `VELO_SEED_DEMO`.
-При HTTPS включите `VELO_COOKIE_SECURE=1`. Пароль `velo_local` предназначен для
-локального запуска. Для другой среды измените `VELO_POSTGRES_PASSWORD` и URL.
-
-Лайки, комментарии, видео и маркетплейс пока не реализованы.
+Новые регистрации требуют email. Ранее созданные записи без email сохраняются,
+но вход по username больше не поддерживается. См. контракт API.

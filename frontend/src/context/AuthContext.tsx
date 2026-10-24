@@ -26,12 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return () => {active=false;};
  },[]);
  async function login(credentials: LoginDto) {
-  const response=await authApi.login(credentials);
-  setUser(response.user);
+  await authApi.login(credentials);
+  setUser(await authApi.getCurrentUser());
  }
  async function register(data: CreateUserDto) {
   await authApi.register(data);
-  await login({username:data.email,password:data.password});
+  await login({email:data.email,password:data.password});
  }
  function logout() {
   void api.post('/auth/logout').then(() => setUser(null)).catch(() => alert('Не удалось выйти. Попробуйте снова.'));

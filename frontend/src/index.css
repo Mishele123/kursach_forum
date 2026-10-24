@@ -1,0 +1,172 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,'Segoe UI',sans-serif;color:#1b3028;background:#f5f7f3;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit}
+button,a,input,textarea{touch-action:manipulation}
+button,a{transition:background .15s}
+button{cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+a{text-decoration:none;color:inherit}
+img{max-width:100%;height:auto}
+button:focus-visible,a:focus-visible{outline:3px solid #8fae56;outline-offset:3px}
+h1,h2,p{margin-top:0}
+h1{font-size:28px;line-height:36px;font-weight:700;letter-spacing:-.6px}
+h2{font-size:21px;line-height:1.4;font-weight:600}
+p{font-size:14px}
+hr{border:0;border-top:1px solid #dfe5dc;margin:24px 0}
+.velo-header{height:94px;background:white;display:flex;align-items:center;gap:28px;padding:20px 24px;position:sticky;top:0;z-index:20;width:100%}
+.logo{font-size:34px;font-weight:700;color:#246b50;letter-spacing:-1px}
+.header-search{flex:1;min-width:0;margin:0}
+.header-search input{width:100%;background:#f5f7f3;border:0;border-radius:12px;padding:13px;font-size:14px}
+.header-tagline{color:#7c877f;font-size:12px;text-align:center;white-space:nowrap}
+.velo-header>.velo-button{white-space:nowrap}
+.velo-button{border:0;background:#246b50;color:white;display:inline-flex;align-items:center;justify-content:center;border-radius:11px;padding:12px 22px;font-size:13px;font-weight:600;line-height:1.2}
+.velo-button:hover{background:#1a553e}
+.velo-button.secondary{color:#246b50;background:#eaf1e6}
+.velo-button.secondary:hover{background:#dce8d7}
+.velo-shell{display:grid;grid-template-columns:216px minmax(0,1fr) 280px;gap:28px;max-width:1440px;margin:auto;padding:32px}
+.velo-main{min-width:0}
+.velo-sidebar{align-self:start;position:sticky;top:126px}
+.eyebrow{font-size:10px;color:#768078;margin:0 0 12px}
+.velo-sidebar nav{display:grid;gap:18px}
+.velo-sidebar nav a{padding:9px 14px;min-height:38px;font-size:14px;border-radius:11px}
+.velo-sidebar nav a.active{background:#246b50;color:white;text-align:center;font-size:12px;font-weight:600}
+.topic-links{display:grid;gap:10px;color:#78857c;font-size:14px}
+.sidebar-cta{margin-top:12px;background:#eaf1e6;border-radius:16px;padding:20px 18px;color:#246b50}
+.sidebar-cta h2{font-size:18px}
+.sidebar-cta p{font-size:12px;margin:12px 0 22px}
+.sidebar-cta a{display:block;text-align:center;font-size:12px;font-weight:600}
+.velo-page{padding:0}
+.velo-page>.subtitle{margin:8px 0 20px;line-height:21px}
+.subtitle{color:#7e8981;font-size:14px}
+.velo-card{padding:24px;background:white;border-radius:19px;margin-bottom:20px}
+.velo-card p{color:#7e8981}
+.velo-form{padding:28px;display:grid;gap:22px}
+.velo-form .subtitle{margin:0}
+.velo-form input,.velo-form textarea{background:#f5f7f3;border:0;border-radius:11px;box-shadow:none}
+.velo-form input[type="file"]{padding:8px 12px;max-width:100%;min-width:0}
+.velo-form input[type="file"]::file-selector-button{margin-right:10px}
+.velo-form label{color:#1b3028;font-size:12px}
+.velo-form input:focus,.velo-form textarea:focus{outline:2px solid #246b50}
+.form-actions{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
+.form-actions button{min-height:44px}
+.avatar{width:40px;height:40px;background:#eaf1e6;display:flex;align-items:center;justify-content:center;color:#246b50;border-radius:50%;font-size:14px;flex-shrink:0}
+.avatar.large{width:76px;height:76px;font-size:26px;margin-bottom:18px}
+.avatar img.avatar-image{width:100%;height:100%;object-fit:cover;border-radius:inherit;margin:0;display:block}
+.profile-fields{border:0;padding:0;margin:0;min-width:0;display:grid;gap:20px}
+.profile-avatar-editor{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.profile-avatar-editor .avatar{margin:0}
+.profile-avatar-editor>div:last-child{min-width:0;flex:1 1 220px}
+.profile-avatar-editor input{max-width:100%}
+.profile-avatar-editor .subtitle{margin:4px 0 8px}
+.avatar-remove{display:block;margin-top:10px;border:0;background:transparent;padding:0;color:#246b50;text-decoration:underline}
+.bike-photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:12px;margin-bottom:16px}
+.profile-bike{margin-bottom:20px}
+.profile-bike .bike-photo{max-width:360px}
+.velo-right{display:grid;gap:20px;align-content:start}
+.velo-right .velo-card{padding:20px;margin:0}
+.velo-right h2{font-size:18px}
+.velo-right .velo-button{width:100%;margin-top:8px}
+.velo-right small{color:#7d8880;font-size:11px}
+.garage-card{background:#246b50;color:white;padding:20px;border-radius:17px}
+.garage-card .eyebrow{color:#dfedb6}
+.garage-card h2{font-size:24px;margin-bottom:16px}
+.garage-card p{font-size:12px;margin:12px 0 0}
+.garage-card .eyebrow{font-size:10px;margin:0 0 14px}
+.garage-card h2{line-height:29px}
+.garage-card .landscape{height:106px;object-fit:cover}
+.velo-right .velo-card p{font-size:13px;line-height:19px;margin:14px 0}
+.velo-right .velo-card h2{font-size:18px;line-height:24px;margin:0}
+.velo-right .velo-button{min-height:38px;padding:10px 14px}
+.landscape{display:block;width:100%;height:auto}
+.post-card h2{font-size:24px;line-height:1.3;margin:18px 0}
+.post-author{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.post-author strong{font-size:14px}
+.post-author p{font-size:11px;margin:0}
+.category-badge{display:inline-block;padding:10px 18px;background:#eaf1e6;color:#246b50;border-radius:10px;font-size:12px;font-weight:600}
+.post-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+.post-card img{display:block;margin:16px auto;max-height:480px;object-fit:contain}
+.post-card footer{border-top:1px solid #e2e7df;padding-top:16px;font-size:13px;color:#718078}
+.composer{padding:20px}
+.composer h2{font-size:18px;margin-bottom:14px}
+.composer-prompt{display:block;min-height:47px;background:#f5f7f3;padding:14px;border-radius:11px;color:#7e8981;font-size:13px;margin-bottom:14px}
+.composer>div{display:flex;align-items:center;gap:14px;font-size:12px;color:#7e8981}
+.composer .velo-button{margin-left:144px;width:139px;min-height:38px;padding:10px 18px}
+.category-tabs{display:flex;gap:9px;flex-wrap:wrap;margin:20px 0}
+.category-tabs button{padding:10px 20px;min-height:38px;background:#eaf1e6;color:#246b50;border:0;border-radius:11px;font-size:12px;font-weight:600}
+.category-tabs button.selected{background:#246b50;color:white}
+.bike-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin-top:24px}
+.bike-grid h2{margin:18px 0 5px}
+.error{background:#fff0ed;color:#a73120!important;border-radius:10px;padding:14px;overflow-wrap:anywhere}
+.auth-screen{padding:56px;display:grid;grid-template-columns:1.2fr 1fr;gap:100px;min-height:100vh}
+.auth-hero{border-radius:25px;background:#246b50;color:white;padding:48px;display:flex;flex-direction:column;justify-content:center}
+.auth-hero .logo{color:#dbed9f;font-size:48px}
+.auth-hero h1{font-size:48px;line-height:1.4;margin:32px 0}
+.auth-hero p{font-size:18px}
+.auth-hero .landscape{width:90%;margin:24px auto}
+.auth-form{max-width:476px;width:100%;padding-top:40px}
+.auth-form h1{margin-bottom:24px}
+.auth-form form{display:grid;gap:20px}
+.auth-form input{background:#f5f7f3;border:0;border-radius:10px;min-height:48px}
+.auth-form label{font-size:12px}
+.auth-form .velo-button{width:100%;min-height:45px;margin-top:8px}
+.auth-form hr{margin:22px 0}
+.auth-form .subtitle{margin-bottom:20px}
+
+@media(min-width:1500px){.velo-header{justify-content:start}}
+
+@media(max-width:1250px){.velo-header{display:flex;gap:24px}.header-search{flex:1;min-width:0}.velo-header>.avatar{margin-left:0}.header-tagline{display:none}}
+@media(max-width:1150px){.velo-shell{grid-template-columns:190px minmax(0,1fr);gap:24px}
+.velo-right{display:none}
+.header-tagline{display:none}
+.velo-header{display:flex;gap:24px}
+.header-search{flex:1}
+.velo-header>.avatar{margin-left:0}
+.auth-screen{gap:40px;padding:32px}
+.auth-hero{padding:32px}
+.auth-hero h1{font-size:38px}
+}
+
+@media(max-width:700px){.velo-header{height:72px;padding:12px 18px;gap:14px}
+.logo{font-size:29px}
+.header-search{display:none}
+.velo-header>.velo-button{margin-left:auto}
+.velo-shell{display:block;padding:0 16px 28px}
+.velo-sidebar{position:static;padding:12px 0 20px}
+.velo-sidebar>.eyebrow,.velo-sidebar hr,.topic-links,.sidebar-cta{display:none}
+.velo-sidebar nav{display:flex;gap:4px;overflow:auto}
+.velo-sidebar nav a{white-space:nowrap;padding:10px 14px;font-size:13px}
+.velo-page h1{font-size:27px}
+.velo-card{padding:20px;border-radius:16px}
+.velo-form{gap:20px}
+.velo-form .form-actions{align-items:stretch}
+.form-actions>*{flex:1;text-align:center}
+.category-tabs{flex-wrap:nowrap;overflow:auto;padding-bottom:4px;gap:8px}
+.category-tabs button{white-space:nowrap;flex-shrink:0}
+.post-card h2{font-size:22px}
+.composer>div{gap:10px}
+.composer .velo-button{padding:12px;margin-left:auto;width:auto}
+.auth-screen{display:block;padding:24px}
+.auth-hero{padding:24px;min-height:auto}
+.auth-hero h1{font-size:28px;margin:16px 0}
+.auth-hero p,.auth-hero .landscape{display:none}
+.auth-hero .logo{font-size:30px}
+.auth-form{padding-top:28px;max-width:none}
+.auth-form h1{font-size:28px}
+.bike-grid{grid-template-columns:1fr}
+}
+
+
+fieldset{border:0;padding:0;margin:0;min-width:0}
+.auth-form input[type=checkbox]{width:16px;min-height:16px;margin-right:8px;accent-color:#246b50}
+legend,.velo-form label{font-weight:600;font-size:12px}
+.velo-form textarea{display:block;width:100%;padding:14px;resize:vertical}
+.velo-form small{color:#7e8981;font-size:11px}
+.format-toolbar{display:flex;gap:12px;align-items:center;padding:10px 0}
+.format-toolbar button{border:0;background:#eaf1e6;border-radius:6px;padding:4px 12px}
+.format-toolbar span{font-size:11px;color:#7e8981}
+.upload-area{border:1px dashed #cbd7c5;border-radius:12px;padding:20px}
+.upload-area p{font-size:12px;margin:8px 0 16px}
+.upload-area input{max-width:100%;font-size:12px}
+.upload-preview{display:block;max-height:220px;margin-top:16px;border-radius:10px}
+.velo-form .btn-primary{background:#246b50}
+.velo-form .category-tabs{margin-bottom:0}

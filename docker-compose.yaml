@@ -7,8 +7,27 @@ services:
     ports:
       - "127.0.0.1:5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     restart: unless-stopped
+    networks:
+      - app_network
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: kursach-migrate
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
     networks:
       - app_network
 
@@ -33,6 +52,8 @@ services:
       postgres:
         condition: service_healthy
         required: true
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
         required: true

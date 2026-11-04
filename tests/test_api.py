@@ -163,3 +163,78 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('HttpOnly', cookie)
         self.assertIn('Max-Age=', cookie)
         self.assertIn('SameSite=lax', cookie)
+
+    async def test_people_search_combined_filters(self):
+        city = 'Город_' + secrets.token_hex(5)
+        ids = []
+        # First user has the desired brand and model on DIFFERENT bikes.
+        for bikes in [[('Trek', 'Domane'), ('Giant', 'Marlin')],
+                      [('Trek', 'Marlin'), ('Trek', 'Marlin 7')],
+                      [('TREK', 'MARLIN')]]:
+            await self.account()
+            user = (await self.client.patch('/users/me', json={
+                'city': city, 'discipline': 'MTB', 'interests': ['поездки']})).json()
+            ids.append(user['id'])
+            for brand, model in bikes:
+                self.assertEqual((await self.client.post('/users/me/bikes', json={
+                    'brand': brand, 'model': model, 'year': 2024})).status_code, 201)
+        self.client.cookies.clear()
+        filters = {'city': city.lower(), 'discipline': 'mtb', 'brand': 'trek', 'model': 'marlin', 'limit': 1}
+        response = await self.client.get('/users', params=filters)
+        self.assertEqual(response.status_code, 200, response.text)
+        first = response.json()
+        self.assertEqual([u['id'] for u in first['items']], [ids[1]])
+        self.assertEqual(set(first['items'][0]), {'id', 'username', 'city', 'discipline', 'interests'})
+        second = (await self.client.get('/users', params={**filters, 'cursor': first['next_cursor']})).json()
+        self.assertEqual([u['id'] for u in second['items']], [ids[2]])
+        self.assertIsNone(second['next_cursor'])
+        for extra in [{'city': 'no_such_city'}, {'discipline': 'BMX'}, {'brand': '%'}, {'model': '_'}]:
+            self.assertEqual((await self.client.get('/users', params={**filters, **extra})).json()['items'], [])
+        self.assertEqual(len((await self.client.get('/users', params={'city': city})).json()['items']), 3)
+        self.assertEqual((await self.client.get('/users', params={'cursor': 'bad'})).status_code, 422)
+        self.assertEqual((await self.client.get('/users', params={'limit': 0})).status_code, 422)
+
+    async def test_public_profile_posts_and_deleted_user(self):
+        from datetime import datetime, timezone
+        from config import Config
+        from shared import new_session_maker
+        from auth.models import UserModel
+        dto = await self.account()
+        user = (await self.client.get('/users/me')).json()
+        uid = user['id']
+        await self.client.post('/users/me/bikes', json={'brand': 'Trek', 'model': 'Marlin', 'year': 2024})
+        ids = []
+        for i in range(3):
+            r = await self.client.post('/posts', json={'title': f'Пост {i}', 'text': 'Текст', 'category': 'route'})
+            ids.append(r.json()['id'])
+        await self.account()
+        await self.client.post('/posts', json={'title': 'Чужой', 'text': 'Текст', 'category': 'route'})
+        self.client.cookies.clear()
+        r = await self.client.get(f'/users/{uid}')
+        self.assertEqual(r.status_code, 200, r.text)
+        profile = r.json()
+        self.assertEqual(set(profile), {'id', 'username', 'city', 'discipline', 'interests', 'bikes'})
+        self.assertEqual(len(profile['bikes']), 1)
+        self.assertEqual(set(profile['bikes'][0]), {'id', 'brand', 'model', 'year'})
+        page = (await self.client.get(f'/users/{uid}/posts', params={'limit': 2})).json()
+        self.assertEqual([p['id'] for p in page['items']], ids[::-1][:2])
+        following = (await self.client.get(f'/users/{uid}/posts', params={'limit': 2, 'cursor': page['next_cursor']})).json()
+        self.assertEqual([p['id'] for p in following['items']], [ids[0]])
+        self.assertIsNone(following['next_cursor'])
+        self.assertTrue(all(set(p['author']) == {'id', 'username'} for p in page['items']))
+        self.assertEqual((await self.client.get('/users/me')).status_code, 401)
+        self.assertEqual((await self.client.get('/users/me/bikes')).status_code, 401)
+        self.assertEqual((await self.client.get('/users/2147483647')).status_code, 404)
+        self.assertEqual((await self.client.get('/users/2147483647/posts')).status_code, 404)
+        maker = new_session_maker(Config().postgres)
+        try:
+            async with maker() as db:
+                record = await db.get(UserModel, uid)
+                record.deleted_at = datetime.now(timezone.utc)
+                await db.commit()
+            self.assertEqual((await self.client.get(f'/users/{uid}')).status_code, 404)
+            self.assertEqual((await self.client.get(f'/users/{uid}/posts')).status_code, 404)
+            found = (await self.client.get('/users', params={'cursor': uid - 1, 'limit': 100})).json()
+            self.assertNotIn(uid, [u['id'] for u in found['items']])
+        finally:
+            await maker.kw['bind'].dispose()

@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from community.bikes import router as bikes_router
+from community.people import router as people_router
 from community.profile import router as profile_router
 from community.routes import router as posts_router
 from auth.controllers import auth_router, register_exception_handlers
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(posts_router)
     app.include_router(profile_router)
     app.include_router(bikes_router)
+    app.include_router(people_router)
     setup_dishka(container, app)
 
     Instrumentator(

@@ -6,13 +6,13 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, Path
 from starlette.concurrency import run_in_threadpool
 from community.media import MAX_UPLOAD_BYTES, save_photo
-from sqlalchemy import select, tuple_
+from sqlalchemy import select, tuple_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.current_user import current_user
 from auth.models import UserModel
 from auth.repositories import RedisCache
 from community.models import Post
-from community.schemas import AuthorResponse, FeedResponse, PostCreate, PostResponse
+from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse
 
 PostId = Annotated[int, Path(ge=1, le=2147483647)]
 
@@ -40,8 +40,16 @@ async def create_post(dto: PostCreate, request: Request, db: FromDishka[AsyncSes
 
 @router.get('')
 async def feed(db: FromDishka[AsyncSession], limit: int = Query(20, ge=1, le=100),
-               cursor: str | None = Query(None, max_length=200)) -> FeedResponse:
+               cursor: str | None = Query(None, max_length=200),
+               q: str | None = Query(None, max_length=200),
+               category: Category | None = Query(None)) -> FeedResponse:
     query = select(Post, UserModel).join(UserModel, Post.author_id == UserModel.id).where(UserModel.deleted_at.is_(None))
+    if q and q.strip():
+        term = q.strip()
+        query = query.where(or_(Post.title.icontains(term, autoescape=True),
+                                Post.text.icontains(term, autoescape=True)))
+    if category is not None:
+        query = query.where(Post.category == category)
     if cursor:
         try:
             stamp, ident = base64.b64decode(cursor, altchars=b'-_', validate=True).decode().split('|')

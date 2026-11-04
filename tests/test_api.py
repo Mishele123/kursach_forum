@@ -238,3 +238,57 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn(uid, [u['id'] for u in found['items']])
         finally:
             await maker.kw['bind'].dispose()
+
+    async def test_post_search_across_pages_and_combined_filters(self):
+        await self.account()
+        term = 'Озеро' + secrets.token_hex(5)
+        expected = []
+        for title, text, category in [
+            (term, 'Первый маршрут', 'route'),
+            ('Второй маршрут', term.upper(), 'route'),
+            (term.lower(), 'Третий маршрут', 'route'),
+            (term, 'Обслуживание', 'maintenance'),
+        ]:
+            r = await self.client.post('/posts', json={'title': title, 'text': text, 'category': category})
+            self.assertEqual(r.status_code, 201, r.text)
+            if category == 'route': expected.append(r.json()['id'])
+        # Matching posts are older than an entire default-sized first page.
+        for i in range(21):
+            r = await self.client.post('/posts', json={'title': f'Новый {i}', 'text': 'Без совпадения', 'category': 'route'})
+            self.assertEqual(r.status_code, 201)
+        self.client.cookies.clear()
+        first = (await self.client.get('/posts')).json()
+        self.assertTrue(set(expected).isdisjoint(p['id'] for p in first['items']))
+        params = {'q': '  ' + term.swapcase() + '  ', 'category': 'route', 'limit': 2}
+        seen = []
+        for _ in range(10):
+            response = await self.client.get('/posts', params=params)
+            self.assertEqual(response.status_code, 200, response.text)
+            page = response.json()
+            seen.extend(p['id'] for p in page['items'])
+            if page['next_cursor'] is None: break
+            params['cursor'] = page['next_cursor']
+        else: self.fail('Pagination did not terminate')
+        self.assertEqual(seen, expected[::-1])
+        self.assertEqual(len(seen), len(set(seen)))
+        all_matches = (await self.client.get('/posts', params={'q': term})).json()
+        self.assertEqual(len(all_matches['items']), 4)
+        for params in [{'q': term, 'category': 'tricks'}, {'q': 'missing' + term}]:
+            self.assertEqual((await self.client.get('/posts', params=params)).json(), {'items': [], 'next_cursor': None})
+        self.assertEqual((await self.client.get('/posts', params={'category': 'unknown'})).status_code, 422)
+        self.assertEqual((await self.client.get('/posts', params={'q': 'x' * 201})).status_code, 422)
+        blank = (await self.client.get('/posts', params={'q': '   '})).json()
+        self.assertEqual(blank, first)
+        only_category = (await self.client.get('/posts', params={'category': 'route'})).json()
+        self.assertTrue(all(p['category'] == 'route' for p in only_category['items']))
+
+    async def test_post_search_treats_wildcards_as_text(self):
+        await self.account()
+        marker = secrets.token_hex(5)
+        literal = marker + '%_'
+        for text in [literal, marker + 'XX']:
+            r = await self.client.post('/posts', json={'title': 'Поиск', 'text': text, 'category': 'upgrade'})
+            self.assertEqual(r.status_code, 201)
+        self.client.cookies.clear()
+        result = (await self.client.get('/posts', params={'q': literal})).json()
+        self.assertEqual([p['text'] for p in result['items']], [literal])

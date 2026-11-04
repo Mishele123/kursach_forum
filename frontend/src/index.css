@@ -170,3 +170,15 @@ legend,.velo-form label{font-weight:600;font-size:12px}
 .upload-preview{display:block;max-height:220px;margin-top:16px;border-radius:10px}
 .velo-form .btn-primary{background:#246b50}
 .velo-form .category-tabs{margin-bottom:0}
+
+.comments-panel{margin-top:20px}
+.comments-panel h2{margin:0 0 8px}
+.comments-panel .velo-form{margin:20px 0}
+.comments-panel textarea{border:1px solid #cbd7c5;border-radius:10px;font:inherit}
+.comments-panel button:disabled{opacity:.55;cursor:not-allowed}
+.comments-login{padding:16px;background:#f0f5ed;border-radius:10px}
+.comments-login a{color:#246b50;text-decoration:underline}
+.comment-item{padding:18px 0;border-top:1px solid #e3e9df}
+.comment-item header{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.comment-item time{font-size:12px;color:#65736a}
+.comment-item p{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 0}

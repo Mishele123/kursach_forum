@@ -7,6 +7,7 @@ from config import WebConfig
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from community.comments import router as comments_router
 from community.bikes import router as bikes_router
 from community.people import router as people_router
 from community.profile import router as profile_router
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(auth_router)
     app.include_router(posts_router)
+    app.include_router(comments_router)
     app.include_router(profile_router)
     app.include_router(bikes_router)
     app.include_router(people_router)

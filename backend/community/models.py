@@ -27,3 +27,13 @@ class Bike(Base):
     brand: Mapped[str] = mapped_column(String(100))
     model: Mapped[str] = mapped_column(String(100))
     year: Mapped[int]
+
+
+class Comment(Base):
+    __tablename__ = 'comments'
+    __table_args__ = (Index('ix_comments_post_id_id', 'post_id', 'id'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey('posts.id', ondelete='CASCADE'))
+    author_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    text: Mapped[str] = mapped_column(String(3000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

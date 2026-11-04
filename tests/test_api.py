@@ -292,3 +292,34 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.client.cookies.clear()
         result = (await self.client.get('/posts', params={'q': literal})).json()
         self.assertEqual([p['text'] for p in result['items']], [literal])
+
+    async def test_comments_create_read_and_pagination(self):
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Обсуждение','text':'Текст','category':'route'})).json()
+        url = f"/posts/{post['id']}/comments"
+        self.assertEqual((await self.client.get(url)).json(), {'items': [], 'next_cursor': None})
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.post(url, json={'text':'Гость'})).status_code, 401)
+        dto = await self.account()
+        ids = []
+        for i in range(3):
+            r = await self.client.post(url, json={'text':f'  Ответ {i}  '})
+            self.assertEqual(r.status_code, 201, r.text)
+            self.assertEqual(r.json()['text'], f'Ответ {i}')
+            self.assertEqual(r.json()['author']['username'], dto['username'])
+            self.assertEqual(set(r.json()['author']), {'id','username'})
+            ids.append(r.json()['id'])
+        for payload in [{'text':'  \n '}, {'text':'x'*3001}, {'text':'Текст','author_id':1}]:
+            self.assertEqual((await self.client.post(url, json=payload)).status_code, 422)
+        self.assertEqual((await self.client.post('/posts/2147483647/comments', json={'text':'Текст'})).status_code, 404)
+        self.assertEqual((await self.client.get('/posts/2147483647/comments')).status_code, 404)
+        other = (await self.client.post('/posts', json={'title':'Другой','text':'Текст','category':'route'})).json()
+        await self.client.post(f"/posts/{other['id']}/comments", json={'text':'В другой ветке'})
+        self.client.cookies.clear()
+        first = (await self.client.get(url, params={'limit':2})).json()
+        self.assertEqual([c['id'] for c in first['items']], ids[::-1][:2])
+        second = (await self.client.get(url, params={'limit':2,'cursor':first['next_cursor']})).json()
+        self.assertEqual([c['id'] for c in second['items']], [ids[0]])
+        self.assertIsNone(second['next_cursor'])
+        self.assertEqual(len((await self.client.get(url)).json()['items']), 3)
+        self.assertEqual((await self.client.get(url, params={'cursor':'bad'})).status_code, 422)

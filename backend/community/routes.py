@@ -3,7 +3,7 @@ import binascii
 from datetime import datetime
 from typing import Annotated
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, Path
+from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile, Path
 from starlette.concurrency import run_in_threadpool
 from community.media import MAX_UPLOAD_BYTES, save_photo
 from sqlalchemy import select, tuple_, or_
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.current_user import current_user
 from auth.models import UserModel
 from auth.repositories import RedisCache
+from community.post_likes import attach_likes, viewer_id
 from community.models import Post
 from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse
 
@@ -39,7 +40,8 @@ async def create_post(dto: PostCreate, request: Request, db: FromDishka[AsyncSes
 
 
 @router.get('')
-async def feed(db: FromDishka[AsyncSession], limit: int = Query(20, ge=1, le=100),
+async def feed(request: Request, response: Response, db: FromDishka[AsyncSession],
+               sessions: FromDishka[RedisCache], limit: int = Query(20, ge=1, le=100),
                cursor: str | None = Query(None, max_length=200),
                q: str | None = Query(None, max_length=200),
                category: Category | None = Query(None)) -> FeedResponse:
@@ -61,6 +63,8 @@ async def feed(db: FromDishka[AsyncSession], limit: int = Query(20, ge=1, le=100
         query = query.where(tuple_(Post.created_at, Post.id) < tuple_(moment, post_id))
     rows = (await db.execute(query.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1))).all()
     items = [post_response(post, user) for post, user in rows[:limit]]
+    await attach_likes(db, items, await viewer_id(request, db, sessions))
+    response.headers["Cache-Control"] = "private, no-store"
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1][0]
@@ -69,12 +73,16 @@ async def feed(db: FromDishka[AsyncSession], limit: int = Query(20, ge=1, le=100
 
 
 @router.get('/{post_id}')
-async def get_post(post_id: PostId, db: FromDishka[AsyncSession]) -> PostResponse:
+async def get_post(post_id: PostId, request: Request, response: Response,
+                   db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> PostResponse:
     row = (await db.execute(select(Post, UserModel).join(UserModel, Post.author_id == UserModel.id)
                            .where(Post.id == post_id, UserModel.deleted_at.is_(None)))).first()
     if row is None:
         raise HTTPException(404, 'Пост не найден')
-    return post_response(*row)
+    result = post_response(*row)
+    await attach_likes(db, [result], await viewer_id(request, db, sessions))
+    response.headers["Cache-Control"] = "private, no-store"
+    return result
 
 
 @router.put('/{post_id}/photo')
@@ -95,6 +103,7 @@ async def upload_photo(post_id: PostId, request: Request, db: FromDishka[AsyncSe
     try:
         post.photo_filename = filename
         result = post_response(post, user)
+        await attach_likes(db, [result], user.id)
         await db.commit()
     except BaseException:
         (directory / filename).unlink(missing_ok=True)

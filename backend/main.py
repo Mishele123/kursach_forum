@@ -7,6 +7,7 @@ from config import WebConfig
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from community.likes import router as likes_router
 from community.comments import router as comments_router
 from community.bikes import router as bikes_router
 from community.people import router as people_router
@@ -59,7 +60,7 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     app.add_middleware(CORSMiddleware, allow_origins=web.allowed_origins,
-                       allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "PUT"],
+                       allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
                        allow_headers=["Content-Type"])
     upload_dir = Path(os.environ.get("UPLOAD_DIR", str(Path(__file__).resolve().parent.parent / "uploads")))
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(posts_router)
     app.include_router(comments_router)
+    app.include_router(likes_router)
     app.include_router(profile_router)
     app.include_router(bikes_router)
     app.include_router(people_router)

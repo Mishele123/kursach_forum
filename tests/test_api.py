@@ -323,3 +323,100 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second['next_cursor'])
         self.assertEqual(len((await self.client.get(url)).json()['items']), 3)
         self.assertEqual((await self.client.get(url, params={'cursor':'bad'})).status_code, 422)
+
+    async def test_likes_idempotency_and_viewer_state(self):
+        owner = await self.account()
+        owner_id = (await self.client.get('/auth/me')).json()['id']
+        post = (await self.client.post('/posts', json={'title':'Лайки','text':'Текст','category':'route'})).json()
+        pid = post['id']; url = f'/posts/{pid}/like'
+        self.assertEqual((post['like_count'], post['liked_by_me']), (0, False))
+        for _ in range(2):
+            r = await self.client.put(url)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json(), {'post_id':pid,'like_count':1,'liked_by_me':True})
+        for endpoint in [f'/posts/{pid}', '/posts', f'/users/{owner_id}/posts']:
+            r = await self.client.get(endpoint)
+            body = r.json()
+            item = next(p for p in body['items'] if p['id']==pid) if 'items' in body else body
+            self.assertEqual((item['like_count'],item['liked_by_me']), (1,True))
+            self.assertEqual(r.headers['cache-control'], 'private, no-store')
+        self.client.cookies.clear()
+        guest = (await self.client.get(f'/posts/{pid}')).json()
+        self.assertEqual((guest['like_count'],guest['liked_by_me']), (1,False))
+        self.assertEqual((await self.client.put(url)).status_code, 401)
+        self.assertEqual((await self.client.delete(url)).status_code, 401)
+        self.client.cookies.set('session_id','expired-session')
+        self.assertEqual((await self.client.get(f'/posts/{pid}')).status_code, 200)
+        self.client.cookies.clear()
+        await self.account()
+        self.assertEqual((await self.client.put(url)).json()['like_count'], 2)
+        for _ in range(2):
+            self.assertEqual((await self.client.delete(url)).json(), {'post_id':pid,'like_count':1,'liked_by_me':False})
+        self.assertEqual((await self.client.put('/posts/2147483647/like')).status_code, 404)
+        self.assertEqual((await self.client.delete('/posts/2147483647/like')).status_code, 404)
+        await self.client.post('/auth/logout')
+        await self.client.post('/auth/login', json={k:owner[k] for k in ('email','password')})
+        self.assertTrue((await self.client.get(f'/posts/{pid}')).json()['liked_by_me'])
+        self.assertEqual((await self.client.delete(url)).json()['like_count'], 0)
+
+    async def test_concurrent_likes_and_browser_delete(self):
+        import asyncio
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Одновременно','text':'Текст','category':'route'})).json()
+        url = f"/posts/{post['id']}/like"
+        results = await asyncio.gather(*[self.client.put(url) for _ in range(6)])
+        self.assertTrue(all(r.status_code==200 and r.json()['like_count']==1 for r in results))
+        results = await asyncio.gather(*[self.client.delete(url) for _ in range(6)])
+        self.assertTrue(all(r.status_code==200 and r.json()['like_count']==0 for r in results))
+        mixed = await asyncio.gather(self.client.put(url), self.client.delete(url))
+        self.assertTrue(all(r.status_code==200 for r in mixed))
+        current = (await self.client.get(f"/posts/{post['id']}")).json()
+        self.assertEqual(current['like_count'], int(current['liked_by_me']))
+        await self.client.delete(url)
+        preflight = await self.client.options(url, headers={'Origin':'http://localhost:5173','Access-Control-Request-Method':'DELETE'})
+        self.assertEqual(preflight.status_code, 200)
+        self.assertIn('DELETE', preflight.headers['access-control-allow-methods'])
+        self.assertEqual((await self.client.delete(url,headers={'Origin':'https://untrusted.example'})).status_code,403)
+
+    async def test_likes_multiple_users_and_disabled_accounts(self):
+        import asyncio
+        from datetime import datetime, timezone, timedelta
+        from config import Config
+        from shared import new_session_maker
+        from auth.models import UserModel
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Поддержка','text':'Текст','category':'route'})).json()
+        url = f"/posts/{post['id']}/like"
+        first_id = (await self.client.get('/auth/me')).json()['id']
+        first_cookie = {'Cookie':'session_id=' + self.client.cookies.get('session_id')}
+        await self.account()
+        second_id = (await self.client.get('/auth/me')).json()['id']
+        second_cookie = {'Cookie':'session_id=' + self.client.cookies.get('session_id')}
+        results = await asyncio.gather(*[self.client.put(url,headers=cookie)
+                                        for cookie in [first_cookie,second_cookie]*3])
+        self.assertTrue(all(r.status_code==200 for r in results))
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).json()['like_count'],2)
+        maker = new_session_maker(Config().postgres)
+        try:
+            async with maker() as db:
+                user = await db.get(UserModel, second_id)
+                user.banned_until = datetime.now(timezone.utc) + timedelta(days=1)
+                await db.commit()
+            for method in [self.client.put,self.client.delete]:
+                self.assertEqual((await method(url,headers=second_cookie)).status_code,403)
+            async with maker() as db:
+                user = await db.get(UserModel, second_id)
+                user.deleted_at = datetime.now(timezone.utc)
+                await db.commit()
+            self.assertEqual((await self.client.put(url,headers=second_cookie)).status_code,401)
+            data = (await self.client.get(f"/posts/{post['id']}",headers=first_cookie)).json()
+            self.assertEqual((data['like_count'],data['liked_by_me']),(1,True))
+            async with maker() as db:
+                user = await db.get(UserModel, first_id)
+                user.deleted_at = datetime.now(timezone.utc)
+                await db.commit()
+            await self.account()
+            self.assertEqual((await self.client.put(url)).status_code,404)
+            self.assertEqual((await self.client.delete(url)).status_code,404)
+        finally:
+            await maker.kw['bind'].dispose()

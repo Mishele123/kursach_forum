@@ -25,6 +25,8 @@ class PostResponse(BaseModel):
     title: str
     text: str
     category: Category
+    like_count: int = 0
+    liked_by_me: bool = False
     photo_url: str | None
     created_at: datetime
 

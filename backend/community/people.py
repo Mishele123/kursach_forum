@@ -2,11 +2,13 @@
 from typing import Annotated
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth.repositories import RedisCache
+from community.post_likes import attach_likes, viewer_id
 from auth.models import UserModel
 from community.bikes import BikeResponse
 from community.models import Bike, Post
@@ -82,7 +84,8 @@ async def get_public_profile(user_id: UserId, db: FromDishka[AsyncSession]) -> P
 
 
 @router.get('/{user_id}/posts')
-async def user_posts(user_id: UserId, db: FromDishka[AsyncSession],
+async def user_posts(user_id: UserId, request: Request, response: Response,
+                     db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache],
                      limit: int = Query(20, ge=1, le=100),
                      cursor: int | None = Query(None, ge=1, le=2147483647)) -> FeedResponse:
     user = await public_user(db, user_id)
@@ -90,5 +93,8 @@ async def user_posts(user_id: UserId, db: FromDishka[AsyncSession],
     if cursor is not None:
         query = query.where(Post.id < cursor)
     posts = list(await db.scalars(query.order_by(Post.id.desc()).limit(limit + 1)))
-    return FeedResponse(items=[post_response(post, user) for post in posts[:limit]],
+    items = [post_response(post, user) for post in posts[:limit]]
+    await attach_likes(db, items, await viewer_id(request, db, sessions))
+    response.headers["Cache-Control"] = "private, no-store"
+    return FeedResponse(items=items,
                         next_cursor=str(posts[limit - 1].id) if len(posts) > limit else None)

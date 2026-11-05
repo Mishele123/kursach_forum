@@ -558,3 +558,48 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         responses = await asyncio.gather(*[self.client.put('/auth/password', json={
             'current_password':'GoodPassword123', 'new_password':f'ChangedPassword{i}'}) for i in range(2)])
         self.assertEqual(sorted(r.status_code for r in responses), [204, 400])
+
+    async def test_username_change_validation_and_public_authors(self):
+        endpoint = '/users/me/username'
+        self.assertEqual((await self.client.patch(endpoint, json={'username':'new_name'})).status_code, 401)
+        other = await self.account()
+        owner = await self.account()
+        user = (await self.client.get('/auth/me')).json()
+        post = (await self.client.post('/posts', json={'title':'Rename','text':'Test','category':'route'})).json()
+        await self.client.post(f"/posts/{post['id']}/comments", json={'text':'Original author'})
+        for name in ['', 'ab', 'a'*51, 'bad-name', 'имя', 'bad name', None]:
+            self.assertEqual((await self.client.patch(endpoint, json={'username':name})).status_code, 422)
+        self.assertEqual((await self.client.patch(endpoint, json={'username':'new_name','user_id':123})).status_code, 422)
+        self.assertEqual((await self.client.patch(endpoint, json={'username':other['username'].upper()})).status_code, 409)
+        self.assertEqual((await self.client.get('/auth/me')).json()['username'], owner['username'])
+        name = 'renamed_' + secrets.token_hex(5)
+        renamed = await self.client.patch(endpoint, json={'username':'  '+name+'  '})
+        self.assertEqual(renamed.status_code, 200, renamed.text)
+        self.assertEqual(renamed.json()['username'], name)
+        self.assertEqual(renamed.json()['id'], user['id'])
+        self.assertEqual((await self.client.patch(endpoint, json={'username':name})).status_code, 200)
+        self.assertEqual((await self.client.get('/auth/me')).json()['username'], name)
+        self.assertEqual((await self.client.get(f"/users/{user['id']}" )).json()['username'], name)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}" )).json()['author']['username'], name)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}/comments")).json()['items'][0]['author']['username'], name)
+        await self.client.post('/auth/logout')
+        login = await self.client.post('/auth/login', json={'email':owner['email'],'password':owner['password']})
+        self.assertEqual(login.status_code, 200, login.text)
+        self.assertEqual(login.json()['username'], name)
+        await self.client.post('/auth/login', json={'email':other['email'],'password':other['password']})
+        self.assertEqual((await self.client.get('/auth/me')).json()['username'], other['username'])
+
+    async def test_concurrent_username_conflict(self):
+        import asyncio
+        await self.account()
+        first_cookie = self.client.cookies.get('session_id')
+        await self.account()
+        second_cookie = self.client.cookies.get('session_id')
+        name = 'claimed_' + secrets.token_hex(5)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://test') as first, \
+                   httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://test') as second:
+            first.cookies.set('session_id', first_cookie)
+            second.cookies.set('session_id', second_cookie)
+            results = await asyncio.gather(first.patch('/users/me/username', json={'username':name}),
+                                           second.patch('/users/me/username', json={'username':name.upper()}))
+        self.assertEqual(sorted(r.status_code for r in results), [200, 409])

@@ -39,3 +39,18 @@ def save_photo(data: bytes, directory: Path) -> str:
         path.unlink(missing_ok=True)
         raise
     return filename
+
+
+async def receive_photo(file, directory: Path) -> str:
+    from starlette.concurrency import run_in_threadpool
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, 'Максимальный размер фотографии — 5 МБ')
+    return await run_in_threadpool(save_photo, data, directory)
+
+
+def remove_photo(directory: Path, filename: str | None) -> None:
+    import re
+    # Never follow arbitrary paths or delete externally hosted legacy avatars.
+    if filename and re.fullmatch(r'[0-9a-f]{32}\.jpg', filename):
+        (directory / filename).unlink(missing_ok=True)

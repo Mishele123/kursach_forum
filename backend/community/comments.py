@@ -35,7 +35,7 @@ class CommentsPage(BaseModel):
 
 def response(comment: Comment, user: UserModel) -> CommentResponse:
     return CommentResponse(id=comment.id, post_id=comment.post_id,
-        author=AuthorResponse(id=user.id, username=user.username),
+        author=AuthorResponse(id=user.id, username=user.username, avatar_url=user.avatar_url),
         text=comment.text, created_at=comment.created_at)
 
 

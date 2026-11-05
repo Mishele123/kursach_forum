@@ -25,6 +25,7 @@ class PublicUser(BaseModel):
     id: int
     username: str
     city: str | None
+    avatar_url: str | None = None
     discipline: str | None
     interests: list[str]
 

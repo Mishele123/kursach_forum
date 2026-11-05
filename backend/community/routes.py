@@ -21,7 +21,7 @@ router = APIRouter(prefix='/posts', tags=['Posts'], route_class=DishkaRoute)
 
 
 def post_response(post: Post, author: UserModel) -> PostResponse:
-    return PostResponse(id=post.id, author=AuthorResponse(id=author.id, username=author.username),
+    return PostResponse(id=post.id, author=AuthorResponse(id=author.id, username=author.username, avatar_url=author.avatar_url),
                         title=post.title, text=post.text, category=post.category, created_at=post.created_at,
                         photo_url=f"/media/{post.photo_filename}" if post.photo_filename else None)
 

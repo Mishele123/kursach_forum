@@ -17,6 +17,7 @@ class PostCreate(BaseModel):
 class AuthorResponse(BaseModel):
     id: int
     username: str
+    avatar_url: str | None = None
 
 
 class PostResponse(BaseModel):

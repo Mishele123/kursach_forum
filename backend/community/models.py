@@ -27,6 +27,11 @@ class Bike(Base):
     brand: Mapped[str] = mapped_column(String(100))
     model: Mapped[str] = mapped_column(String(100))
     year: Mapped[int]
+    photo_filename: Mapped[str | None] = mapped_column(String(64))
+
+    @property
+    def photo_url(self) -> str | None:
+        return f"/media/{self.photo_filename}" if self.photo_filename else None
 
 
 class Comment(Base):

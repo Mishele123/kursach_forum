@@ -3,17 +3,17 @@ import binascii
 from datetime import datetime
 from typing import Annotated
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile, Path
-from starlette.concurrency import run_in_threadpool
-from community.media import MAX_UPLOAD_BYTES, save_photo
+from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile, Path, Form, File
+from community.media import remove_photo
+from community.post_photos import attach_photos, save_batch, MAX_POST_PHOTOS
 from sqlalchemy import select, tuple_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.current_user import current_user
 from auth.models import UserModel
 from auth.repositories import RedisCache
 from community.post_likes import attach_likes, viewer_id
-from community.models import Post
-from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse
+from community.models import Post, PostPhoto
+from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse, Title, Text
 
 PostId = Annotated[int, Path(ge=1, le=2147483647)]
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix='/posts', tags=['Posts'], route_class=DishkaRoute)
 def post_response(post: Post, author: UserModel) -> PostResponse:
     return PostResponse(id=post.id, author=AuthorResponse(id=author.id, username=author.username, avatar_url=author.avatar_url),
                         title=post.title, text=post.text, category=post.category, created_at=post.created_at,
-                        photo_url=f"/media/{post.photo_filename}" if post.photo_filename else None)
+                        photo_url=None)
 
 
 @router.post('', status_code=201)
@@ -63,6 +63,7 @@ async def feed(request: Request, response: Response, db: FromDishka[AsyncSession
         query = query.where(tuple_(Post.created_at, Post.id) < tuple_(moment, post_id))
     rows = (await db.execute(query.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1))).all()
     items = [post_response(post, user) for post, user in rows[:limit]]
+    await attach_photos(db, items)
     await attach_likes(db, items, await viewer_id(request, db, sessions))
     response.headers["Cache-Control"] = "private, no-store"
     next_cursor = None
@@ -70,6 +71,27 @@ async def feed(request: Request, response: Response, db: FromDishka[AsyncSession
         last = rows[limit - 1][0]
         next_cursor = base64.urlsafe_b64encode(f'{last.created_at.isoformat()}|{last.id}'.encode()).decode()
     return FeedResponse(items=items, next_cursor=next_cursor)
+
+
+@router.post('/with-photos', status_code=201)
+async def create_post_with_photos(request: Request, db: FromDishka[AsyncSession],
+                                  sessions: FromDishka[RedisCache],
+                                  title: Annotated[Title, Form()], text: Annotated[Text, Form()],
+                                  category: Annotated[Category, Form()],
+                                  files: Annotated[list[UploadFile], File(max_length=MAX_POST_PHOTOS)]) -> PostResponse:
+    user = await current_user(request, db, sessions)
+    post = Post(author_id=user.id, title=title, text=text, category=category)
+    db.add(post)
+    await db.flush()
+    await db.refresh(post)
+    directory = request.app.state.upload_dir
+    try:
+        filenames = await save_batch(files, directory)
+    except BaseException:
+        await db.rollback()
+        raise
+    db.add_all([PostPhoto(post_id=post.id, filename=name) for name in filenames])
+    return await finish_photos(post, user, db, directory, filenames)
 
 
 @router.get('/{post_id}')
@@ -80,34 +102,62 @@ async def get_post(post_id: PostId, request: Request, response: Response,
     if row is None:
         raise HTTPException(404, 'Пост не найден')
     result = post_response(*row)
+    await attach_photos(db, [result])
     await attach_likes(db, [result], await viewer_id(request, db, sessions))
     response.headers["Cache-Control"] = "private, no-store"
+    return result
+
+
+async def owned_post(post_id, request, db, sessions):
+    user = await current_user(request, db, sessions)
+    post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise HTTPException(404, 'Пост не найден')
+    if post.author_id != user.id:
+        raise HTTPException(403, 'Изменять фотографии может только автор')
+    return post, user
+
+
+async def finish_photos(post, user, db, directory, filenames, previous=None):
+    try:
+        await db.flush()
+        result = post_response(post, user)
+        await attach_photos(db, [result])
+        await attach_likes(db, [result], user.id)
+        await db.commit()
+    except BaseException:
+        await db.rollback()
+        for filename in filenames:
+            remove_photo(directory, filename)
+        raise
+    remove_photo(directory, previous)
     return result
 
 
 @router.put('/{post_id}/photo')
 async def upload_photo(post_id: PostId, request: Request, db: FromDishka[AsyncSession],
                        sessions: FromDishka[RedisCache], file: UploadFile) -> PostResponse:
-    user = await current_user(request, db, sessions)
-    post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())
-    if post is None:
-        raise HTTPException(404, 'Пост не найден')
-    if post.author_id != user.id:
-        raise HTTPException(403, 'Изменять фотографию может только автор')
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, 'Максимальный размер фотографии — 5 МБ')
+    post, user = await owned_post(post_id, request, db, sessions)
+    cover = await db.scalar(select(PostPhoto).where(PostPhoto.post_id == post.id).order_by(PostPhoto.id).limit(1))
     directory = request.app.state.upload_dir
-    filename = await run_in_threadpool(save_photo, data, directory)
-    previous = post.photo_filename
-    try:
-        post.photo_filename = filename
-        result = post_response(post, user)
-        await attach_likes(db, [result], user.id)
-        await db.commit()
-    except BaseException:
-        (directory / filename).unlink(missing_ok=True)
-        raise
-    if previous:
-        (directory / previous).unlink(missing_ok=True)
-    return result
+    filenames = await save_batch([file], directory)
+    previous = cover.filename if cover else None
+    if cover:
+        cover.filename = filenames[0]
+    else:
+        db.add(PostPhoto(post_id=post.id, filename=filenames[0]))
+    return await finish_photos(post, user, db, directory, filenames, previous)
+
+
+@router.post('/{post_id}/photos', status_code=201)
+async def upload_photos(post_id: PostId, request: Request, db: FromDishka[AsyncSession],
+                        sessions: FromDishka[RedisCache],
+                        files: Annotated[list[UploadFile], File(max_length=MAX_POST_PHOTOS)]) -> PostResponse:
+    post, user = await owned_post(post_id, request, db, sessions)
+    existing = list(await db.scalars(select(PostPhoto.id).where(PostPhoto.post_id == post.id)))
+    if len(existing) + len(files) > MAX_POST_PHOTOS:
+        raise HTTPException(422, 'В публикации может быть не более 10 фотографий')
+    directory = request.app.state.upload_dir
+    filenames = await save_batch(files, directory)
+    db.add_all([PostPhoto(post_id=post.id, filename=name) for name in filenames])
+    return await finish_photos(post, user, db, directory, filenames)

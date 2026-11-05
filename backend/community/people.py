@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.repositories import RedisCache
+from community.post_photos import attach_photos
 from community.post_likes import attach_likes, viewer_id
 from auth.models import UserModel
 from community.bikes import BikeResponse
@@ -95,6 +96,7 @@ async def user_posts(user_id: UserId, request: Request, response: Response,
         query = query.where(Post.id < cursor)
     posts = list(await db.scalars(query.order_by(Post.id.desc()).limit(limit + 1)))
     items = [post_response(post, user) for post in posts[:limit]]
+    await attach_photos(db, items)
     await attach_likes(db, items, await viewer_id(request, db, sessions))
     response.headers["Cache-Control"] = "private, no-store"
     return FeedResponse(items=items,

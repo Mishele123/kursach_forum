@@ -465,3 +465,70 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('email', profile)
         self.assertEqual((await self.client.get(f"/posts/{post['id']}" )).json()['author']['avatar_url'], avatar)
         self.assertEqual((await self.client.get(f"/posts/{post['id']}/comments")).json()['items'][0]['author']['avatar_url'], avatar)
+
+    async def test_post_gallery_atomicity_and_compatibility(self):
+        from io import BytesIO
+        from PIL import Image
+        image = BytesIO()
+        Image.new('RGB', (8, 8), 'green').save(image, 'PNG')
+        photo = ('files', ('photo.png', image.getvalue(), 'image/png'))
+        data = {'title':'Gallery ' + secrets.token_hex(5), 'text':'Several photos', 'category':'route'}
+        self.assertEqual((await self.client.post('/posts/with-photos', data=data, files=[photo])).status_code, 401)
+        await self.account()
+        user = (await self.client.get('/users/me')).json()
+        before = set(self.app.state.upload_dir.iterdir())
+        bad = ('files', ('bad.png', b'bad', 'image/png'))
+        invalid = await self.client.post('/posts/with-photos', data=data, files=[photo, bad])
+        self.assertEqual(invalid.status_code, 415, invalid.text)
+        self.assertEqual(set(self.app.state.upload_dir.iterdir()), before)
+        self.assertEqual((await self.client.get('/posts', params={'q':data['title']})).json()['items'], [])
+        self.assertEqual((await self.client.post('/posts/with-photos', data={**data,'title':' '}, files=[photo])).status_code, 422)
+        created = await self.client.post('/posts/with-photos', data=data, files=[photo, photo])
+        self.assertEqual(created.status_code, 201, created.text)
+        post = created.json()
+        self.assertEqual(len(post['photos']), 2)
+        self.assertEqual(post['photo_url'], post['photos'][0]['url'])
+        endpoint = f"/posts/{post['id']}/photos"
+        before = set(self.app.state.upload_dir.iterdir())
+        self.assertEqual((await self.client.post(endpoint, files=[photo, bad])).status_code, 415)
+        self.assertEqual(set(self.app.state.upload_dir.iterdir()), before)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}" )).json()['photos'], post['photos'])
+        self.assertEqual((await self.client.post(endpoint, files=[photo]*11)).status_code, 422)
+        self.assertEqual((await self.client.post(endpoint)).status_code, 422)
+        added = await self.client.post(endpoint, files=[photo]*8)
+        self.assertEqual(added.status_code, 201, added.text)
+        self.assertEqual(len(added.json()['photos']), 10)
+        self.assertEqual((await self.client.post(endpoint, files=[photo])).status_code, 422)
+        changed = await self.client.put(f"/posts/{post['id']}/photo", files={'file':photo[1]})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        gallery = changed.json()['photos']
+        self.assertEqual(gallery[1:], added.json()['photos'][1:])
+        self.assertEqual(gallery[0]['id'], post['photos'][0]['id'])
+        self.assertEqual((await self.client.get(post['photo_url'])).status_code, 404)
+        for item in gallery:
+            self.assertEqual((await self.client.get(item['url'])).status_code, 200)
+        await self.account()
+        self.assertEqual((await self.client.post(endpoint, files=[photo])).status_code, 403)
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.post(endpoint, files=[photo])).status_code, 401)
+        for path in ['/posts', f"/users/{user['id']}/posts"]:
+            items = (await self.client.get(path)).json()['items']
+            found = next(p for p in items if p['id'] == post['id'])
+            self.assertEqual(found['photos'], gallery)
+
+    async def test_concurrent_gallery_limit(self):
+        import asyncio
+        from io import BytesIO
+        from PIL import Image
+        image = BytesIO()
+        Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        photo = ('files', ('photo.png', image.getvalue(), 'image/png'))
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Race','text':'Gallery','category':'route'})).json()
+        self.assertEqual(post['photos'], [])
+        endpoint = f"/posts/{post['id']}/photos"
+        before = set(self.app.state.upload_dir.iterdir())
+        results = await asyncio.gather(*[self.client.post(endpoint, files=[photo]*6) for _ in range(2)])
+        self.assertEqual(sorted(r.status_code for r in results), [201, 422])
+        self.assertEqual(len((await self.client.get(f"/posts/{post['id']}" )).json()['photos']), 6)
+        self.assertEqual(len(set(self.app.state.upload_dir.iterdir()) - before), 6)

@@ -9,3 +9,6 @@ export interface CreatePostDto { title: string; text: string; category: PostCate
 export interface Bike { id: number; brand: string; model: string; year: number; }
 export interface CreateBikeDto { brand: string; model: string; year: number; }
 export interface AuthResponse { username: string; }
+
+export interface Comment { id: number; post_id: number; author: { id: number; username: string }; text: string; created_at: string; }
+export interface CommentsPage { items: Comment[]; next_cursor: number | null; }

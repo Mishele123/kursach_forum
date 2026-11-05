@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { User, CreateUserDto, LoginDto, UpdateUserDto, AuthResponse, Post, CreatePostDto, Bike, CreateBikeDto, FeedResponse } from '../types';
+import type { Comment, CommentsPage, User, CreateUserDto, LoginDto, UpdateUserDto, AuthResponse, Post, CreatePostDto, Bike, CreateBikeDto, FeedResponse } from '../types';
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 const api = axios.create({ baseURL, withCredentials: true });
 export const authApi = {
@@ -30,3 +30,8 @@ export function errorMessage(error:unknown):string {
  return 'Не удалось выполнить запрос. Проверьте подключение и попробуйте снова.';
 }
 export default api;
+
+export const commentsApi = {
+ getComments: async (postId: number, cursor?: number) => (await api.get<CommentsPage>(`/posts/${postId}/comments`, {params: {limit: 10, cursor}})).data,
+ createComment: async (postId: number, text: string) => (await api.post<Comment>(`/posts/${postId}/comments`, {text})).data,
+};

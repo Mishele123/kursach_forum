@@ -97,6 +97,8 @@ def check(browser, base, width):
                 else:
                     result = next(p for p in posts if p['id'] == int(path.split('/')[2]))
                     result['photo_url'] = '/media/test.jpg'
+            elif path.endswith('/comments') and req.method == 'GET':
+                result = {'items': [], 'next_cursor': None}
             elif path.startswith('/posts/') and req.method == 'GET':
                 result = next(p for p in posts if p['id'] == int(path.split('/')[2]))
             elif path == '/media/test.jpg':

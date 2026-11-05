@@ -532,3 +532,29 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(r.status_code for r in results), [201, 422])
         self.assertEqual(len((await self.client.get(f"/posts/{post['id']}" )).json()['photos']), 6)
         self.assertEqual(len(set(self.app.state.upload_dir.iterdir()) - before), 6)
+
+    async def test_password_change(self):
+        dto = {'current_password':'GoodPassword123', 'new_password':'ChangedPassword456'}
+        self.assertEqual((await self.client.put('/auth/password', json=dto)).status_code, 401)
+        owner = await self.account()
+        user = (await self.client.get('/auth/me')).json()
+        for payload, status in [({**dto,'current_password':'WrongPassword'},400),
+                                ({**dto,'new_password':'short'},422),
+                                ({**dto,'new_password':dto['current_password']},422),
+                                ({**dto,'user_id':123},422)]:
+            self.assertEqual((await self.client.put('/auth/password', json=payload)).status_code, status)
+        response = await self.client.put('/auth/password', json=dto)
+        self.assertEqual(response.status_code, 204, response.text)
+        self.assertEqual(response.content, b'')
+        self.assertEqual((await self.client.get('/auth/me')).json()['id'], user['id'])
+        await self.client.post('/auth/logout')
+        self.assertEqual((await self.client.post('/auth/login', json={'email':owner['email'],'password':dto['current_password']})).status_code, 401)
+        self.assertEqual((await self.client.post('/auth/login', json={'email':owner['email'],'password':dto['new_password']})).status_code, 200)
+        self.assertNotIn('password_hash', (await self.client.get('/auth/me')).json())
+
+    async def test_concurrent_password_change(self):
+        import asyncio
+        await self.account()
+        responses = await asyncio.gather(*[self.client.put('/auth/password', json={
+            'current_password':'GoodPassword123', 'new_password':f'ChangedPassword{i}'}) for i in range(2)])
+        self.assertEqual(sorted(r.status_code for r in responses), [204, 400])

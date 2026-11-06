@@ -31,7 +31,7 @@ class SPA(SimpleHTTPRequestHandler):
 def check(browser, base, width):
     user = dict(id=1, username='rider', email='rider@example.com', city=None,
                 discipline=None, interests=[], bio=None, created_at='2026-10-24T10:00:00Z')
-    state = dict(auth=False, bikes=[], created=0, uploads=0, fail_photo=True)
+    state = dict(auth=False, bikes=[], created=0, uploads=0, fail_photo=True, fail_bike_photo=True, bike_uploads=0)
     failures, errors = [], []
     posts = [dict(id=i, author=dict(id=1, username='rider'), title=f'Route {i}',
                   text='Plain <script> text', category='route', photo_url=None,
@@ -43,7 +43,7 @@ def check(browser, base, width):
         path = url.path.removeprefix('/api')
         if not url.netloc.endswith(':8000') and not url.path.startswith('/api/'):
             return route.continue_()
-        data = req.post_data_json if req.method in ('POST', 'PATCH') else None
+        data = req.post_data_json if req.method in ('POST', 'PATCH') and 'application/json' in req.headers.get('content-type', '') else None
         status, result = 200, None
         try:
             if path == '/auth/register':
@@ -74,6 +74,15 @@ def check(browser, base, width):
                     status, result = 201, state['bikes'][-1]
                 else:
                     result = state['bikes']
+            elif path == '/users/me/bikes/1/photo' and req.method == 'PUT':
+                assert 'multipart/form-data; boundary=' in req.headers['content-type']
+                state['bike_uploads'] += 1
+                if state['fail_bike_photo']:
+                    state['fail_bike_photo'] = False
+                    status, result = 415, {'detail': 'Ошибка фотографии велосипеда'}
+                else:
+                    state['bikes'][0]['photo_url'] = '/media/test.jpg'
+                    result = state['bikes'][0]
             elif path == '/posts' and req.method == 'GET':
                 query = parse_qs(url.query)
                 assert set(query) <= {'limit', 'cursor'}
@@ -88,6 +97,17 @@ def check(browser, base, width):
                 result = dict(posts[0], **data, id=100+state['created'])
                 posts.insert(0, result)
                 status = 201
+            elif path == '/posts/with-photos' and req.method == 'POST':
+                assert 'multipart/form-data; boundary=' in req.headers['content-type']
+                state['uploads'] += 1
+                if state['fail_photo']:
+                    state['fail_photo'] = False
+                    status, result = 415, {'detail': 'Повторите загрузку фото'}
+                else:
+                    state['created'] += 1
+                    result = dict(posts[0], id=100+state['created'], title='New route', photo_url='/media/test.jpg', photos=[dict(id=1,url='/media/test.jpg')])
+                    posts.insert(0, result)
+                    status = 201
             elif path.endswith('/photo') and req.method == 'PUT':
                 assert 'multipart/form-data; boundary=' in req.headers['content-type']
                 state['uploads'] += 1
@@ -140,13 +160,23 @@ def check(browser, base, width):
     page.get_by_label('Интересы (через запятую)').fill('MTB, маршруты')
     page.get_by_role('button', name='Сохранить изменения').click()
     page.wait_for_url('**/profile')
-    expect(page.locator('.velo-main')).to_contain_text('MTB, маршруты')
+    expect(page.locator('.interest-tags li')).to_have_text(['MTB', 'маршруты'])
     page.goto(base+'/bikes/add')
     for label, value in [('Бренд *', 'Trek'), ('Модель *', 'Marlin'), ('Год выпуска *', '2024')]:
         page.get_by_label(label, exact=True).fill(value)
+    bike_image = io.BytesIO()
+    Image.new('RGB', (10, 10)).save(bike_image, 'PNG')
+    page.get_by_label('Фотографии (до 1)',exact=True).set_input_files(
+        {'name':'bike.png','mimeType':'image/png','buffer':bike_image.getvalue()})
+    expect(page.locator('.photo-previews img')).to_have_count(1)
     page.get_by_role('button', name='Добавить велосипед', exact=True).click()
+    expect(page.get_by_role('alert')).to_contain_text('Ошибка фотографии велосипеда')
+    expect(page.locator('input[name=brand]')).to_be_disabled()
+    page.get_by_role('button', name='Повторить загрузку фото',exact=True).click()
     page.wait_for_url('**/bikes')
     expect(page.locator('.bike-grid')).to_contain_text('Trek Marlin')
+    expect(page.locator('.bike-grid .bike-photo')).to_be_visible()
+    assert len(state['bikes']) == 1 and state['bike_uploads'] == 2, 'Upload retry must not duplicate the bike'
     for with_photo in (False, True):
         page.goto(base+'/post/create')
         page.get_by_label('Заголовок *', exact=True).fill('New route')
@@ -154,16 +184,16 @@ def check(browser, base, width):
         if with_photo:
             image = io.BytesIO()
             Image.new('RGB', (10, 10)).save(image, 'PNG')
-            page.get_by_label('+ Добавьте одну фотографию').set_input_files(
+            page.get_by_label('Фотографии (до 10)', exact=True).set_input_files(
                 {'name':'ride.png', 'mimeType':'image/png', 'buffer':image.getvalue()})
         page.get_by_role('button', name='Опубликовать', exact=True).click()
         if with_photo:
             expect(page.get_by_role('alert')).to_be_visible()
-            page.get_by_role('button', name='Повторить загрузку фото', exact=True).click()
+            page.get_by_role('button', name='Опубликовать', exact=True).click()
         page.wait_for_url('**/post/*')
         expect(page.get_by_role('heading', name='New route', exact=True)).to_be_visible()
         if with_photo:
-            expect(page.get_by_alt_text('New route')).to_be_visible()
+            expect(page.locator('.post-gallery img')).to_be_visible()
     assert state['created'] == 2, 'Retry must not create a duplicate post'
     assert state['uploads'] == 2
     assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')

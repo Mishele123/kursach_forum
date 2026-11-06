@@ -1,60 +1,101 @@
-# Frontend
+# Клиентская часть Velo
 
-This frontend targets the backend API on `main` at commit `e927ccc`.
-Backend code matches this main revision. The root `docker-compose.yaml` also
-includes the frontend service so the application can be started with one file.
+Веб-интерфейс сообщества велосипедистов на React, TypeScript и Vite.
+Использует API серверной части из этого репозитория. Сервис `frontend`
+включён в корневой файл `docker-compose.yaml`.
 
-Start the main backend separately using its README, then run from this directory:
+## Локальный запуск
+
+Сначала запустите серверную часть по инструкции из корневого README.
+Затем выполните из каталога `frontend`:
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. The default `/api` base uses the Vite proxy to
-http://localhost:8000; `/media` is also proxied. An existing frontend `.env` can
-override this with `VITE_API_URL=http://localhost:8000`. Use the same hostname
-for browser and API so session cookies work. The main backend allows port 5173
-by default. For a frontend Nginx deployment, allow that site's origin in the
-backend deployment configuration.
+Откройте http://localhost:5173. По умолчанию запросы `/api` и `/media`
+проходят через прокси Vite к http://localhost:8000. При необходимости
+задайте `VITE_API_URL=http://localhost:8000` в `frontend/.env`.
+Используйте одинаковое имя хоста для интерфейса и API, чтобы работали
+cookie сессии. При отдельном размещении интерфейса добавьте его адрес
+в список разрешённых источников серверной части.
 
-Integration behavior:
+## Возможности
 
-- Login sends email, password and remember_me; session cookies are sent with
-  requests. The profile is fetched after login because login returns only username.
-- Profile updates use PATCH /users/me with city, discipline, interests and bio.
-  Interests are entered as comma-separated values and sent as a list.
-- Feed pagination uses items/next_cursor. Search and category filters apply to
-  loaded posts locally because the backend has no search/category parameters.
-- Creating a post sends title, text and an English category identifier. Optional
-  JPEG/PNG photos are uploaded separately to PUT /posts/{id}/photo. If photo
-  upload fails, retry reuses the saved post instead of creating a duplicate.
-- Bikes use /users/me/bikes. Username editing, avatar uploads, bike photos and
-  rich text controls are omitted because main does not expose those operations.
-- The former author-filtered profile feed is omitted because main has no
-  author_id filter; the public feed remains available.
+- Регистрация и вход по email и паролю, выход из аккаунта.
+- Лента с поиском по заголовку и тексту, фильтром категории и курсорной
+  пагинацией на сервере. Условия поиска передаются через URL.
+- Поиск участников по городу, дисциплине, бренду и модели велосипеда;
+  публичные профили с велосипедами и публикациями.
+- Создание публикаций с текстом и фотографиями: до 10 изображений,
+  предварительный просмотр, добавление фото к существующей публикации,
+  галерея с просмотром в диалоговом окне.
+- Комментарии и лайки с обработкой ошибок и состояния загрузки.
+- Редактирование профиля: город, дисциплина, интересы и описание.
+- Выбор, кадрирование и загрузка аватара; отображение аватаров
+  в профилях, публикациях, комментариях и шапке сайта.
+- Добавление велосипедов, загрузка и замена их фотографий.
+- Изменение имени пользователя непосредственно в профиле.
+- Смена пароля во вкладке безопасности настроек профиля.
+- Адаптивный интерфейс для компьютеров и телефонов.
 
-Validation:
+## Взаимодействие с API
+
+Запросы отправляются с cookie сессии. После входа профиль загружается
+отдельно: ответ входа содержит только имя пользователя.
+Обновление профиля выполняется через `PATCH /users/me`; интересы
+передаются списком. Публичные профили используют отдельные типы данных
+без email и сведений о сессии.
+
+Публикации без фотографий создаются через `POST /posts`, с фотографиями —
+через `POST /posts/with-photos`. Для добавления фотографий используется
+`POST /posts/{id}/photos`. Клиентские проверки файлов помогают пользователю;
+окончательная проверка формата, размера и прав доступа выполняется сервером.
+
+## Сборка и проверки
+
+Из каталога `frontend`:
 
 ```powershell
 npm run build
-# From the repository root, install frontend browser-check dependencies:
-.venv/Scripts/python.exe -m pip install -r frontend/tests/requirements.txt
-.venv/Scripts/python.exe frontend/tests/verify_main_contract.py
 ```
 
-The browser check runs the built frontend at 1440px and 390px with mocked API
-responses matching main, including cursor pagination, registration, auth errors,
-profile edits, bike creation, text/photo posts and failed photo upload retries.
-It does not connect to a backend or change a database. Live integration with the
-main backend remains a separate check.
-
-To run the frontend container alongside the backend, run from the repository root:
+Сборка проверяет TypeScript и создаёт каталог `dist`.
+Для браузерных проверок из корня репозитория:
 
 ```powershell
-docker compose up -d --build
+.venv/Scripts/python.exe -m pip install -r frontend/tests/requirements.txt
+.venv/Scripts/python.exe frontend/tests/verify_comments.py
+.venv/Scripts/python.exe frontend/tests/verify_avatar_crop.py
+.venv/Scripts/python.exe frontend/tests/verify_profile_design.py
+.venv/Scripts/python.exe frontend/tests/verify_garage_design.py
+.venv/Scripts/python.exe frontend/tests/verify_profile_posts.py
+.venv/Scripts/python.exe frontend/tests/verify_public_profile_design.py
 ```
 
-Configure the root `.env` according to main's `.env.example` first. Run the
-database migrations as described in the root README. The frontend is available
-at http://localhost:5173 and proxies API and media requests to the backend.
+Нужны Microsoft Edge и зависимости из файла требований тестов.
+Часть проверок использует локальную сборку `dist`, часть обращается
+к запущенному интерфейсу на порту 5173. Перед проверками обновите сборку
+и запущенный интерфейс. Ответы API подменяются; база данных не изменяется.
+
+Некоторые старые комплексные проверки, включая `verify_main_contract.py`,
+`verify_sprint2.py` и `verify_profile.py`, используют селекторы предыдущей
+версии интерфейса. Их необходимо обновить перед использованием для приёмки.
+Проверки с подменённым API не заменяют интеграционные проверки с сервером.
+
+Скриншоты в `output/`, `tests/artifacts/` и кеш Python не включаются
+в Git и контекст сборки Docker.
+
+## Запуск в Docker
+
+Подготовьте корневой `.env` по `.env.example`, затем из корня репозитория:
+
+```powershell
+docker compose up -d --build frontend backend
+```
+
+Compose запускает необходимые PostgreSQL и Redis, выполняет миграции
+перед запуском backend. Интерфейс доступен на http://localhost:5173.
+Nginx перенаправляет запросы API и медиа к серверной части.
+После изменения исходников пересоберите контейнер интерфейса.

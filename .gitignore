@@ -221,3 +221,6 @@ __marimo__/
 
 # Local uploaded photos
 uploads/
+
+# Generated UI screenshots
+/output/

@@ -28,11 +28,13 @@ def check(browser, base, width):
 
     def api(route):
         parsed = urlparse(route.request.url)
-        if not parsed.path.startswith('/api/'):
+        if not parsed.netloc.endswith(':8000') and not parsed.path.startswith('/api/'):
             return route.continue_()
         path = parsed.path.removeprefix('/api')
         def reply(data, status=200):
-            route.fulfill(status=status, content_type='application/json', body=json.dumps(data))
+            route.fulfill(status=status, content_type='application/json', body=json.dumps(data), headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type'})
+        if route.request.method == 'OPTIONS':
+            return reply({},204)
         if path == '/auth/me':
             return reply(user if state['auth'] else {'detail':'Требуется вход'}, 200 if state['auth'] else 401)
         if path == '/posts/1': return reply(post)
@@ -85,7 +87,7 @@ def check(browser, base, width):
     expect(panel.locator('.comment-item').first).to_contain_text(text)
     assert page.evaluate('window.commentXss') is None
     assert not page.evaluate('document.documentElement.scrollWidth > innerWidth')
-    page.screenshot(path=f'/tmp/kursach-comments-{width}.png', full_page=True)
+    page.screenshot(path=str(Path(__file__).parent / 'artifacts' / f'comments-{width}.png'), full_page=True)
     assert not errors, errors
     context.close()
     print(f'PASS {width}px: guest, pagination, errors/retry, submit, reload, escaped text')
@@ -96,7 +98,7 @@ if __name__ == '__main__':
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel='chrome', headless=True)
+            browser = p.chromium.launch(channel='msedge', headless=True)
             for width in (1440, 390):
                 check(browser, f'http://127.0.0.1:{server.server_port}', width)
             browser.close()

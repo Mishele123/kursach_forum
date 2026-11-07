@@ -1,4 +1,6 @@
 import React from 'react';
+import PeoplePage from './pages/PeoplePage';
+import PublicProfilePage from './pages/PublicProfilePage';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { MainLayout } from './components/Layout';
@@ -30,6 +32,8 @@ const App: React.FC = () => {
 
           {/* Routes with Layout */}
           <Route element={<MainLayout />}>
+            <Route path="/people" element={<PeoplePage />} />
+            <Route path="/users/:id" element={<PublicProfilePage />} />
             <Route path={ROUTES.EDIT_PROFILE} element={<ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
             <Route path={ROUTES.ADD_BIKE} element={<ProtectedRoute><AddBikePage /></ProtectedRoute>} />
             <Route path={ROUTES.POST_DETAIL} element={<PostDetailPage />} />

@@ -1,0 +1,30 @@
+.feed-page .feed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 24px;
+  border: 1px solid #e0e7df;
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+  box-shadow: none;
+}
+.feed-empty .feed-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  color: #246b50;
+  background: #eaf2e8;
+}
+.feed-empty-icon svg { width: 29px; height: 29px; }
+.feed-page .feed-empty h2 { margin: 0 0 10px; font-size: 23px; line-height: 1.3; font-weight: 700; letter-spacing: -.4px; }
+.feed-page .feed-empty p { margin: 0; max-width: 440px; font-size: 14px; line-height: 1.65; color: #748078; }
+.feed-empty .velo-button { margin-top: 22px; min-height: 42px; padding: 12px 20px; border-radius: 10px; }
+@media (max-width: 700px) {
+  .feed-page .feed-empty { padding: 30px 18px; border-radius: 16px; }
+  .feed-page .feed-empty h2 { font-size: 21px; }
+  .feed-page .feed-empty p { font-size: 13px; }
+}

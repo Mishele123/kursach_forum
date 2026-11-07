@@ -1,60 +1,81 @@
-# Frontend
+# Клиентская часть Velo
 
-This frontend targets the backend API on `main` at commit `e927ccc`.
-Backend code matches this main revision. The root `docker-compose.yaml` also
-includes the frontend service so the application can be started with one file.
+Веб-интерфейс сообщества велосипедистов на React, TypeScript и Vite. Использует API серверной части из этого репозитория. Сервис `frontend` включён в корневой файл `docker-compose.yaml`.
 
-Start the main backend separately using its README, then run from this directory:
+## Технологии и их назначение
 
-```powershell
-npm ci
-npm run dev
+Версии ниже указаны по диапазонам зависимостей в `package.json`. Точные версии установки фиксируются в `package-lock.json`.
+
+| Технология | Версия | Для чего используется |
+|---|---|---|
+| React и React DOM | 19.3.x | Компоненты интерфейса и отображение приложения в браузере |
+| TypeScript | ~7.0.2 | Типы данных API, свойства компонентов и проверка кода при сборке |
+| Vite | ^8.3.4 | Сервер разработки, обновление модулей и сборка статических файлов |
+| React Router DOM | ^7.18.4 | Переходы между страницами, параметры маршрутов и URL поиска |
+| Axios | ^1.20.0 | HTTP-запросы к API, передача cookie и файлов |
+| Tailwind CSS | ^3.4.19 | Служебные CSS-классы и общие стили компонентов |
+| PostCSS и Autoprefixer | ^8.5.31 / ^10.6.1 | Обработка CSS при сборке |
+| Обычный CSS | — | Цвета, сетки, адаптивная вёрстка и оформление отдельных страниц |
+| Docker и Nginx | — | Сборка контейнера, раздача интерфейса и проксирование API |
+| Python, Playwright и Pillow | `tests/requirements.txt` | Браузерные проверки и работа с тестовыми изображениями |
+
+Приложение работает как SPA: браузер загружает HTML и JavaScript, а последующие переходы между страницами обрабатывает React Router. Данные пользователей, публикаций и велосипедов поступают из backend. Frontend не подключается к PostgreSQL или Redis напрямую.
+
+## Структура проекта
+
+```text
+frontend/
+├── public/                    # Статические файлы, включая favicon велосипеда
+├── src/
+│   ├── main.tsx               # Точка входа: создание React-приложения
+│   ├── App.tsx                # Маршруты, AuthProvider и подключение общих стилей
+│   ├── components/
+│   │   ├── Auth/              # ProtectedRoute: доступ к страницам после входа
+│   │   ├── Layout/            # Шапка, навигация и боковые панели
+│   │   ├── common/            # Поля, кнопки, аватары, выбор и загрузка фото
+│   │   ├── posts/             # Карточки публикаций, комментарии и галерея
+│   │   └── *.tsx              # Настройки аккаунта, редактор аватара и блоки профиля
+│   ├── context/AuthContext.tsx # Текущий пользователь и операции входа/выхода
+│   ├── hooks/                 # Загрузка публикации и велосипедов
+│   ├── pages/                 # Страницы приложения и их локальные стили
+│   ├── services/api.ts        # Axios, группы API-методов и обработка ошибок
+│   ├── types/index.ts         # TypeScript-типы пользователей, публикаций и ответов
+│   ├── utils/                 # Маршруты, категории и форматирование дат
+│   ├── styles/tailwind.css    # Директивы Tailwind и общие классы
+│   └── index.css              # Общие стили и адаптивная вёрстка
+├── tests/                     # Браузерные проверки на Python
+├── index.html                 # HTML-оболочка приложения и favicon
+├── vite.config.ts             # Порт разработки и прокси API/медиа
+├── tailwind.config.cjs         # Сканирование классов и расширение темы
+├── postcss.config.cjs          # Подключение Tailwind и Autoprefixer
+├── nginx.conf                 # Раздача SPA и прокси в контейнере
+├── Dockerfile                 # Сборка Node.js → раздача через Nginx
+└── package.json               # Зависимости и команды npm
 ```
 
-Open http://localhost:5173. The default `/api` base uses the Vite proxy to
-http://localhost:8000; `/media` is also proxied. An existing frontend `.env` can
-override this with `VITE_API_URL=http://localhost:8000`. Use the same hostname
-for browser and API so session cookies work. The main backend allows port 5173
-by default. For a frontend Nginx deployment, allow that site's origin in the
-backend deployment configuration.
+## Как работает приложение
 
-Integration behavior:
+### Запуск и маршрутизация
 
-- Login sends email, password and remember_me; session cookies are sent with
-  requests. The profile is fetched after login because login returns only username.
-- Profile updates use PATCH /users/me with city, discipline, interests and bio.
-  Interests are entered as comma-separated values and sent as a list.
-- Feed pagination uses items/next_cursor. Search and category filters apply to
-  loaded posts locally because the backend has no search/category parameters.
-- Creating a post sends title, text and an English category identifier. Optional
-  JPEG/PNG photos are uploaded separately to PUT /posts/{id}/photo. If photo
-  upload fails, retry reuses the saved post instead of creating a duplicate.
-- Bikes use /users/me/bikes. Username editing, avatar uploads, bike photos and
-  rich text controls are omitted because main does not expose those operations.
-- The former author-filtered profile feed is omitted because main has no
-  author_id filter; the public feed remains available.
+1. Браузер открывает `index.html`, который подключает `src/main.tsx`.
+2. `main.tsx` создаёт корень React и отображает `App` внутри `StrictMode`.
+3. `App` подключает `AuthProvider` и `BrowserRouter`.
+4. Router выбирает страницу по адресу. Общая оболочка `MainLayout`
+   отображает шапку, навигацию, содержимое через `Outlet` и боковую панель.
+5. При смене пути внутри оболочки позиция прокрутки возвращается к началу.
 
-Validation:
+| Адрес | Страница | Доступ |
+|---|---|---|
+| `/` | Перенаправление на `/feed` | Всем |
+| `/login`, `/register` | Вход и регистрация, без общей оболочки | Всем |
+| `/feed` | Лента публикаций | Всем |
+| `/people` | Поиск участников | Всем |
+| `/users/:id` | Публичный профиль участника | Всем |
+| `/post/:id` | Публикация и комментарии | Всем; действия зависят от авторизации |
+| `/post/create` | Создание публикации | После входа |
+| `/profile` | Собственный профиль | После входа |
+| `/profile/edit` | Настройки профиля и пароля | После входа |
+| `/bikes`, `/bikes/add` | Собственные велосипеды и добавление | После входа |
 
-```powershell
-npm run build
-# From the repository root, install frontend browser-check dependencies:
-.venv/Scripts/python.exe -m pip install -r frontend/tests/requirements.txt
-.venv/Scripts/python.exe frontend/tests/verify_main_contract.py
-```
+Неизвестные адреса отображают страницу 404.
 
-The browser check runs the built frontend at 1440px and 390px with mocked API
-responses matching main, including cursor pagination, registration, auth errors,
-profile edits, bike creation, text/photo posts and failed photo upload retries.
-It does not connect to a backend or change a database. Live integration with the
-main backend remains a separate check.
-
-To run the frontend container alongside the backend, run from the repository root:
-
-```powershell
-docker compose up -d --build
-```
-
-Configure the root `.env` according to main's `.env.example` first. Run the
-database migrations as described in the root README. The frontend is available
-at http://localhost:5173 and proxies API and media requests to the backend.

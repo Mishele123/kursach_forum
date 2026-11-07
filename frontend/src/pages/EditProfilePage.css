@@ -1,0 +1,57 @@
+﻿/* Profile settings preview: scoped to the edit route. */
+.velo-shell.settings-shell{max-width:1536px;grid-template-columns:200px minmax(0,1fr);gap:32px}
+.profile-redesign [hidden]{display:none!important}
+.profile-redesign .back-link{display:flex;align-items:center;gap:14px;margin-bottom:20px;font-size:13px}
+.profile-redesign .page-heading{align-items:center;margin-bottom:24px}
+.profile-redesign .page-heading h1{font-size:32px;line-height:1.2;margin-bottom:10px}
+.profile-redesign .page-heading .subtitle{max-width:650px;line-height:1.7}
+.profile-view-link{border:1px solid #87a394;border-radius:8px;padding:10px 14px;color:#245e48;font-size:13px;white-space:nowrap}
+.profile-view-link:hover{background:#e8efdf}
+.profile-settings-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}
+.profile-settings-editor{min-width:0}
+.profile-tabs{display:flex;gap:14px;border-bottom:1px solid #cdd9cc;margin-bottom:24px}
+.profile-tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 18px;color:#72776e;font-weight:600;font-size:15px}
+.profile-tabs button[aria-current]{border-bottom-color:#24634d;color:#24634d}
+.profile-tabs button:hover{background:#edf2e7}
+.profile-redesign .velo-card{border-radius:13px;box-shadow:none;padding:24px;border:1px solid #dce3d8;background:#fff}
+.profile-redesign .avatar-crop-card{position:relative;padding-left:156px;min-height:180px;margin-bottom:22px}
+.profile-redesign .avatar-crop-card h2{font-size:20px}
+.profile-redesign .avatar-crop-card>.subtitle{font-size:13px;margin-bottom:16px}
+.profile-redesign .avatar-crop-preview{position:absolute;left:24px;top:36px;width:108px;height:108px}
+.profile-redesign .avatar-crop-controls{gap:9px}
+.profile-redesign .photo-picker-button{padding:10px 14px;font-size:13px}
+.profile-redesign .profile-about-card h2{font-size:22px;margin-bottom:5px}
+.profile-redesign .profile-about-card .subtitle{font-size:12px;margin:0}
+.profile-redesign .profile-fields{gap:24px}
+.profile-redesign .profile-location-grid{gap:18px}
+.profile-redesign input,.profile-redesign textarea{background:#fff;border-color:#cfd9cc;border-radius:8px;font-size:14px}
+.profile-redesign input:focus,.profile-redesign textarea:focus{outline:2px solid #91ad8e;outline-offset:2px}
+.profile-redesign label,.interest-label{font-size:13px;font-weight:600;color:#283c31}
+.interest-label{display:flex;justify-content:space-between;margin-bottom:10px}.interest-label small{font-weight:400;color:#798476}
+.interest-chips{display:flex;flex-wrap:wrap;gap:8px}
+.interest-chips button{border:1px solid #d6ddcf;border-radius:30px;background:#fff;color:#53634f;padding:6px 12px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.interest-chips button[aria-pressed=true]{background:#e3edd7;color:#245a40;border-color:#e3edd7}
+.interest-add{display:flex;align-items:flex-end;gap:10px;margin-top:15px}.interest-add>div{flex:1;min-width:0}.interest-add button{border:1px solid #d6ddcf;background:#fff;border-radius:8px;padding:11px 12px;white-space:nowrap;font-size:12px;color:#346449}
+.profile-redesign .bio-counter{text-align:right;font-size:11px;color:#7a8676;margin:5px 0 0}
+.profile-save-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:20px 0}
+.profile-cancel{border:1px solid #9bac9d;background:transparent;color:#4b6153;padding:10px 18px;border-radius:8px;font-size:13px}
+.save-status{font-size:11px;color:#64745c;display:flex;align-items:center;gap:7px}.save-status:before{content:'';height:6px;width:6px;background:#6b9653;border-radius:50%;flex-shrink:0}.save-status.unsaved:before{background:#b7924b}
+.profile-live-preview{position:sticky;top:120px;padding-top:10px;min-width:0}
+.profile-live-preview>h2{font-size:18px;margin:0 0 18px}
+.profile-preview-card{border:1px solid #dce3d8;background:#fff;border-radius:14px;overflow:hidden}
+.preview-cover{height:150px;overflow:hidden;background:#dce7d1}.preview-cover .landscape{width:100%;height:100%;object-fit:cover;display:block}
+.preview-details{padding:0 20px 18px}.preview-details .preview-avatar{position:relative;width:88px;height:88px;border:4px solid #fff;margin-top:-44px;font-size:28px;overflow:hidden}
+.preview-details h3{font-size:24px;line-height:1.3;margin:10px 0 4px;overflow-wrap:anywhere}
+.preview-city{font-size:13px;color:#687562;margin-bottom:10px;overflow-wrap:anywhere}.preview-discipline{display:inline-block;background:#e3edd7;color:#3c6036;border-radius:20px;padding:4px 12px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.preview-bio{font-size:13px;line-height:1.8;margin:14px 0;color:#435140;white-space:pre-wrap;overflow-wrap:anywhere}
+.preview-interests{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}.preview-interests span{background:#f3f6ee;padding:3px 8px;border-radius:5px;font-size:10px;color:#687b60;overflow-wrap:anywhere;max-width:100%}
+.preview-bike-link{border-top:1px solid #dce3d8;display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:15px}.preview-bike-link strong{display:block;font-size:13px}.preview-bike-link small{display:block;font-size:11px;color:#7c8577;margin-top:4px}.preview-bike-link>span{font-size:25px;color:#426e50}
+.preview-privacy{display:flex;gap:12px;margin-top:20px;background:#e6eddb;border-radius:12px;padding:18px;color:#345b3b}.preview-privacy>span{font-size:22px}.preview-privacy p{font-size:12px;margin:0;line-height:1.7}.preview-privacy small{display:block;color:#6a7a60;font-size:11px;margin-top:7px}
+@media(min-width:1600px){.profile-settings-grid{grid-template-columns:minmax(0,1fr) 350px;gap:32px}}
+@media(max-width:1150px){.velo-shell.settings-shell{grid-template-columns:170px minmax(0,1fr);gap:24px}.profile-settings-grid{grid-template-columns:minmax(0,1fr) 260px;gap:20px}.profile-redesign .page-heading{align-items:flex-start}.profile-view-link{font-size:11px}.profile-redesign .avatar-crop-card{padding-left:24px}.profile-redesign .avatar-crop-preview{position:static;width:76px;height:76px}.profile-redesign .avatar-crop-layout{gap:18px}.profile-redesign .page-heading h1{font-size:28px}}
+@media(max-width:950px){.profile-settings-grid{grid-template-columns:minmax(0,1fr)}.profile-live-preview{position:static;max-width:540px;width:100%;padding-top:10px}.profile-redesign .page-heading{flex-wrap:wrap}.preview-cover{height:180px}}
+@media(max-width:700px){.velo-shell.settings-shell{display:block;padding:0 16px 28px}.profile-redesign .page-heading h1{font-size:27px}.profile-redesign .page-heading .subtitle{font-size:12px}.profile-tabs{gap:4px}.profile-tabs button{padding:12px 13px;font-size:13px}.profile-redesign .velo-card{padding:20px}.profile-redesign .profile-location-grid{grid-template-columns:1fr}.profile-redesign .avatar-crop-card{padding-left:20px}.profile-save-bar{gap:10px}.save-status{flex-basis:100%;margin-top:4px}.interest-add{flex-wrap:wrap}.interest-add>div{flex-basis:180px}}
+
+.profile-redesign .avatar-crop-dialog{position:fixed;inset:0}
+
+.profile-redesign .avatar-crop-dialog{overflow-anchor:none;scrollbar-gutter:stable}.profile-redesign .avatar-crop-dialog *{overflow-anchor:none}

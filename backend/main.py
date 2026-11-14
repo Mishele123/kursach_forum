@@ -7,6 +7,7 @@ from config import WebConfig
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from community.moderation import router as moderation_router
 from community.likes import router as likes_router
 from community.comments import router as comments_router
 from community.bikes import router as bikes_router
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(posts_router)
     app.include_router(comments_router)
     app.include_router(likes_router)
+    app.include_router(moderation_router)
     app.include_router(profile_router)
     app.include_router(bikes_router)
     app.include_router(people_router)

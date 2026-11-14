@@ -678,3 +678,53 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(removed.status_code, 200, removed.text)
         self.assertIsNone(removed.json()['place'])
         self.assertIsNone((await self.client.get(f"/posts/{own['id']}")).json()['place'])
+
+    async def test_roles_and_moderation_permissions(self):
+        from auth.models import UserModel, UserRole
+        from shared import new_session_maker
+        from config import Config
+        from sqlalchemy import select
+        user = await self.account()
+        user_id = (await self.client.get('/auth/me')).json()['id']
+        post = (await self.client.post('/posts', json={'title':'Пост','text':'Текст','category':'route'})).json()
+        comment = (await self.client.post(f"/posts/{post['id']}/comments", json={'text':'Тест'})).json()
+        user_cookie = self.client.cookies.get('session_id')
+        moderator = await self.account()
+        moderator_id = (await self.client.get('/auth/me')).json()['id']
+        moderator_cookie = self.client.cookies.get('session_id')
+        admin = await self.account()
+        admin_id = (await self.client.get('/auth/me')).json()['id']
+        admin_cookie = self.client.cookies.get('session_id')
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'user')
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'moderator'})).status_code, 403)
+        # Bootstrap is an operator action; tests grant the first admin directly in the disposable DB.
+        maker = new_session_maker(Config().postgres)
+        try:
+            async with maker() as db:
+                record = await db.scalar(select(UserModel).where(UserModel.id == admin_id))
+                record.role = UserRole.ADMIN
+                await db.commit()
+        finally:
+            await maker.kw["bind"].dispose()
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'admin')
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'admin'})).status_code, 422)
+        self.assertEqual((await self.client.put(f'/admin/users/{admin_id}/role', json={'role':'user'})).status_code, 403)
+        changed = await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'moderator'})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(changed.json()['role'], 'moderator')
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'moderator')
+        self.assertEqual((await self.client.put(f'/admin/users/{user_id}/role', json={'role':'moderator'})).status_code, 403)
+        self.client.cookies.set('session_id', user_cookie)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 403)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/moderation")).status_code, 403)
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 204)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 404)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/moderation")).status_code, 204)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).status_code, 404)
+        self.client.cookies.set('session_id', admin_cookie)
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'user'})).status_code, 200)
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'user')
+        self.assertEqual((await self.client.delete('/posts/2147483647/moderation')).status_code, 403)

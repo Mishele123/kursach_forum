@@ -217,3 +217,21 @@ async def delete_post(post_id: PostId, request: Request,
     for filename in filenames:
         remove_photo(request.app.state.upload_dir, filename)
     return Response(status_code=204)
+
+
+@router.delete('/{post_id}/moderation', status_code=204, tags=['Moderation'])
+async def moderate_post(post_id: PostId, request: Request,
+                        db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> Response:
+    from auth.models import UserRole
+    actor = await current_user(request, db, sessions)
+    if actor.role not in {UserRole.MODERATOR, UserRole.ADMIN}:
+        raise HTTPException(403, 'Нужны права модератора')
+    post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise HTTPException(404, 'Пост не найден')
+    filenames = list(await db.scalars(select(PostPhoto.filename).where(PostPhoto.post_id == post.id)))
+    await db.delete(post)
+    await db.commit()
+    for filename in filenames:
+        remove_photo(request.app.state.upload_dir, filename)
+    return Response(status_code=204)

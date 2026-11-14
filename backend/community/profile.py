@@ -26,6 +26,7 @@ class ProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     username: str
+    role: str
     email: str | None
     avatar_url: str | None = None
     city: str | None

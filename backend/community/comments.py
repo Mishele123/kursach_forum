@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Annotated
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response, Path
 from pydantic import BaseModel, ConfigDict, StringConstraints
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.current_user import current_user
-from auth.models import UserModel
+from auth.models import UserModel, UserRole
 from auth.repositories import RedisCache
 from community.models import Comment, Post
 from community.routes import PostId
@@ -72,3 +72,19 @@ async def comments(post_id: PostId, db: FromDishka[AsyncSession],
     rows = (await db.execute(query.order_by(Comment.id.desc()).limit(limit + 1))).all()
     return CommentsPage(items=[response(c, u) for c, u in rows[:limit]],
                         next_cursor=rows[limit - 1][0].id if len(rows) > limit else None)
+
+
+@router.delete('/{post_id}/comments/{comment_id}/moderation', status_code=204, tags=['Moderation'])
+async def moderate_comment(post_id: PostId, comment_id: Annotated[int, Path(ge=1, le=2147483647)],
+                           request: Request, db: FromDishka[AsyncSession],
+                           sessions: FromDishka[RedisCache]) -> Response:
+    actor = await current_user(request, db, sessions)
+    if actor.role not in {UserRole.MODERATOR, UserRole.ADMIN}:
+        raise HTTPException(403, 'Нужны права модератора')
+    comment = await db.scalar(select(Comment).where(Comment.id == comment_id,
+                              Comment.post_id == post_id).with_for_update())
+    if comment is None:
+        raise HTTPException(404, 'Комментарий не найден')
+    await db.delete(comment)
+    await db.commit()
+    return Response(status_code=204)

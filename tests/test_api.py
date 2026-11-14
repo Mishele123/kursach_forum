@@ -635,3 +635,46 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.delete('/posts/2147483647')).status_code, 404)
         # The first author's post and its photo remain untouched by a different account.
         self.assertEqual((await self.client.get(photo_url)).status_code, 200)
+
+    async def test_post_place_create_edit_remove_and_feed(self):
+        from io import BytesIO
+        from PIL import Image
+        await self.account()
+        base = {'title': 'Маршрут у озера', 'text': 'Место старта', 'category': 'route'}
+        place = {'latitude': 55.7558, 'longitude': 37.6173, 'name': 'Старт маршрута'}
+        for invalid in [{'latitude': 91, 'longitude': 0}, {'latitude': 0},
+                        {'latitude': 0, 'longitude': 181}, {'latitude': 'NaN', 'longitude': 0},
+                        {'latitude': 0, 'longitude': 0, 'name': ' '},
+                        {'latitude': 0, 'longitude': 0, 'name': 'x' * 201}]:
+            self.assertEqual((await self.client.post('/posts', json={**base, 'place': invalid})).status_code, 422)
+        created = await self.client.post('/posts', json={**base, 'place': place})
+        self.assertEqual(created.status_code, 201, created.text)
+        post = created.json()
+        self.assertEqual(post['place'], place)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).json()['place'], place)
+        feed = (await self.client.get('/posts', params={'q': base['title']})).json()['items']
+        self.assertEqual(next(p for p in feed if p['id'] == post['id'])['place'], place)
+        user_id = post['author']['id']
+        user_posts = (await self.client.get(f'/users/{user_id}/posts')).json()['items']
+        self.assertEqual(next(p for p in user_posts if p['id'] == post['id'])['place'], place)
+        unchanged = await self.client.put(f"/posts/{post['id']}", json=base)
+        self.assertEqual(unchanged.json()['place'], place)
+        image = BytesIO(); Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        files = [('files', ('photo.png', image.getvalue(), 'image/png'))]
+        multipart = await self.client.post('/posts/with-photos', data={**base,
+            'place_latitude': '0', 'place_longitude': '0', 'place_name': 'Экватор'}, files=files)
+        self.assertEqual(multipart.status_code, 201, multipart.text)
+        self.assertEqual(multipart.json()['place'], {'latitude': 0.0, 'longitude': 0.0, 'name': 'Экватор'})
+        self.assertEqual((await self.client.post('/posts/with-photos', data={**base, 'place_latitude': '10'}, files=files)).status_code, 422)
+        await self.account()
+        self.assertEqual((await self.client.put(f"/posts/{post['id']}", json={**base, 'place': None})).status_code, 403)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).json()['place'], place)
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.put(f"/posts/{post['id']}", json={**base, 'place': None})).status_code, 401)
+        # A fresh author session can remove the place.
+        await self.account()
+        own = (await self.client.post('/posts', json={**base, 'place': place})).json()
+        removed = await self.client.put(f"/posts/{own['id']}", json={**base, 'place': None})
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertIsNone(removed.json()['place'])
+        self.assertIsNone((await self.client.get(f"/posts/{own['id']}")).json()['place'])

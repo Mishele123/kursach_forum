@@ -603,3 +603,35 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             results = await asyncio.gather(first.patch('/users/me/username', json={'username':name}),
                                            second.patch('/users/me/username', json={'username':name.upper()}))
         self.assertEqual(sorted(r.status_code for r in results), [200, 409])
+
+    async def test_update_and_delete_own_post(self):
+        from io import BytesIO
+        from PIL import Image
+        self.assertEqual((await self.client.put('/posts/1', json={'title':'a','text':'b','category':'route'})).status_code, 401)
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Original','text':'Body','category':'route'})).json()
+        post_id = post['id']
+        image = BytesIO(); Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        uploaded = (await self.client.post(f'/posts/{post_id}/photos', files=[('files', ('x.png', image.getvalue(), 'image/png'))])).json()
+        photo_url = uploaded['photo_url']
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':' ','text':'Body','category':'route'})).status_code, 422)
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':'Changed','text':'Updated','category':'tricks','author_id':999})).status_code, 422)
+        await self.account()
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':'Changed','text':'Updated','category':'tricks'})).status_code, 403)
+        self.assertEqual((await self.client.delete(f'/posts/{post_id}')).status_code, 403)
+        self.assertEqual((await self.client.get(f'/posts/{post_id}')).json()['title'], 'Original')
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.delete(f'/posts/{post_id}')).status_code, 401)
+        await self.account()
+        own = (await self.client.post('/posts', json={'title':'Own','text':'Body','category':'route'})).json()
+        response = await self.client.put(f"/posts/{own['id']}", json={'title':'Changed','text':'Updated','category':'tricks'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['title'], 'Changed')
+        self.assertEqual(response.json()['category'], 'tricks')
+        self.assertEqual((await self.client.get(f"/posts/{own['id']}")).json()['text'], 'Updated')
+        self.assertEqual((await self.client.delete(f"/posts/{own['id']}")).status_code, 204)
+        self.assertEqual((await self.client.get(f"/posts/{own['id']}")).status_code, 404)
+        self.assertEqual((await self.client.delete(f"/posts/{own['id']}")).status_code, 404)
+        self.assertEqual((await self.client.delete('/posts/2147483647')).status_code, 404)
+        # The first author's post and its photo remain untouched by a different account.
+        self.assertEqual((await self.client.get(photo_url)).status_code, 200)

@@ -14,6 +14,7 @@ from auth.repositories import RedisCache
 from community.post_likes import attach_likes, viewer_id
 from community.models import Post, PostPhoto
 from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse, Title, Text
+from pydantic import BaseModel, ConfigDict
 
 PostId = Annotated[int, Path(ge=1, le=2147483647)]
 
@@ -114,7 +115,7 @@ async def owned_post(post_id, request, db, sessions):
     if post is None:
         raise HTTPException(404, 'Пост не найден')
     if post.author_id != user.id:
-        raise HTTPException(403, 'Изменять фотографии может только автор')
+        raise HTTPException(403, 'Изменять публикацию может только автор')
     return post, user
 
 
@@ -161,3 +162,35 @@ async def upload_photos(post_id: PostId, request: Request, db: FromDishka[AsyncS
     filenames = await save_batch(files, directory)
     db.add_all([PostPhoto(post_id=post.id, filename=name) for name in filenames])
     return await finish_photos(post, user, db, directory, filenames)
+
+
+class PostUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: Title
+    text: Text
+    category: Category
+
+
+@router.put('/{post_id}')
+async def update_post(post_id: PostId, dto: PostUpdate, request: Request,
+                      db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> PostResponse:
+    post, user = await owned_post(post_id, request, db, sessions)
+    post.title, post.text, post.category = dto.title, dto.text, dto.category
+    await db.flush()
+    result = post_response(post, user)
+    await attach_photos(db, [result])
+    await attach_likes(db, [result], user.id)
+    await db.commit()
+    return result
+
+
+@router.delete('/{post_id}', status_code=204)
+async def delete_post(post_id: PostId, request: Request,
+                      db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> Response:
+    post, _ = await owned_post(post_id, request, db, sessions)
+    filenames = list(await db.scalars(select(PostPhoto.filename).where(PostPhoto.post_id == post.id)))
+    await db.delete(post)
+    await db.commit()
+    for filename in filenames:
+        remove_photo(request.app.state.upload_dir, filename)
+    return Response(status_code=204)

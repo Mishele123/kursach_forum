@@ -13,24 +13,38 @@ from auth.models import UserModel
 from auth.repositories import RedisCache
 from community.post_likes import attach_likes, viewer_id
 from community.models import Post, PostPhoto
-from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse, Title, Text
+from community.schemas import Category, AuthorResponse, FeedResponse, PostCreate, PostResponse, PostPlace, Title, Text
+from pydantic import BaseModel, ConfigDict
 
 PostId = Annotated[int, Path(ge=1, le=2147483647)]
 
 router = APIRouter(prefix='/posts', tags=['Posts'], route_class=DishkaRoute)
 
 
+def place_response(post: Post) -> PostPlace | None:
+    if post.place_latitude is None:
+        return None
+    return PostPlace(latitude=post.place_latitude, longitude=post.place_longitude, name=post.place_name)
+
+
+def set_place(post: Post, place: PostPlace | None) -> None:
+    post.place_latitude = place.latitude if place else None
+    post.place_longitude = place.longitude if place else None
+    post.place_name = place.name if place else None
+
+
 def post_response(post: Post, author: UserModel) -> PostResponse:
     return PostResponse(id=post.id, author=AuthorResponse(id=author.id, username=author.username, avatar_url=author.avatar_url),
                         title=post.title, text=post.text, category=post.category, created_at=post.created_at,
-                        photo_url=None)
+                        place=place_response(post), photo_url=None)
 
 
 @router.post('', status_code=201)
 async def create_post(dto: PostCreate, request: Request, db: FromDishka[AsyncSession],
                       sessions: FromDishka[RedisCache]) -> PostResponse:
     user = await current_user(request, db, sessions)
-    post = Post(author_id=user.id, **dto.model_dump())
+    post = Post(author_id=user.id, **dto.model_dump(exclude={"place"}))
+    set_place(post, dto.place)
     db.add(post)
     await db.flush()
     await db.refresh(post)
@@ -78,9 +92,16 @@ async def create_post_with_photos(request: Request, db: FromDishka[AsyncSession]
                                   sessions: FromDishka[RedisCache],
                                   title: Annotated[Title, Form()], text: Annotated[Text, Form()],
                                   category: Annotated[Category, Form()],
-                                  files: Annotated[list[UploadFile], File(max_length=MAX_POST_PHOTOS)]) -> PostResponse:
+                                  files: Annotated[list[UploadFile], File(max_length=MAX_POST_PHOTOS)],
+                                  place_latitude: Annotated[float | None, Form()] = None,
+                                  place_longitude: Annotated[float | None, Form()] = None,
+                                  place_name: Annotated[str | None, Form()] = None) -> PostResponse:
     user = await current_user(request, db, sessions)
+    if (place_latitude is None) != (place_longitude is None) or (place_latitude is None and place_name is not None):
+        raise HTTPException(422, 'Для места нужны обе координаты')
+    place = PostPlace(latitude=place_latitude, longitude=place_longitude, name=place_name) if place_latitude is not None else None
     post = Post(author_id=user.id, title=title, text=text, category=category)
+    set_place(post, place)
     db.add(post)
     await db.flush()
     await db.refresh(post)
@@ -114,7 +135,7 @@ async def owned_post(post_id, request, db, sessions):
     if post is None:
         raise HTTPException(404, 'Пост не найден')
     if post.author_id != user.id:
-        raise HTTPException(403, 'Изменять фотографии может только автор')
+        raise HTTPException(403, 'Изменять публикацию может только автор')
     return post, user
 
 
@@ -161,3 +182,56 @@ async def upload_photos(post_id: PostId, request: Request, db: FromDishka[AsyncS
     filenames = await save_batch(files, directory)
     db.add_all([PostPhoto(post_id=post.id, filename=name) for name in filenames])
     return await finish_photos(post, user, db, directory, filenames)
+
+
+class PostUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: Title
+    text: Text
+    category: Category
+    place: PostPlace | None = None
+
+
+@router.put('/{post_id}')
+async def update_post(post_id: PostId, dto: PostUpdate, request: Request,
+                      db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> PostResponse:
+    post, user = await owned_post(post_id, request, db, sessions)
+    post.title, post.text, post.category = dto.title, dto.text, dto.category
+    if 'place' in dto.model_fields_set:
+        set_place(post, dto.place)
+    await db.flush()
+    result = post_response(post, user)
+    await attach_photos(db, [result])
+    await attach_likes(db, [result], user.id)
+    await db.commit()
+    return result
+
+
+@router.delete('/{post_id}', status_code=204)
+async def delete_post(post_id: PostId, request: Request,
+                      db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> Response:
+    post, _ = await owned_post(post_id, request, db, sessions)
+    filenames = list(await db.scalars(select(PostPhoto.filename).where(PostPhoto.post_id == post.id)))
+    await db.delete(post)
+    await db.commit()
+    for filename in filenames:
+        remove_photo(request.app.state.upload_dir, filename)
+    return Response(status_code=204)
+
+
+@router.delete('/{post_id}/moderation', status_code=204, tags=['Moderation'])
+async def moderate_post(post_id: PostId, request: Request,
+                        db: FromDishka[AsyncSession], sessions: FromDishka[RedisCache]) -> Response:
+    from auth.models import UserRole
+    actor = await current_user(request, db, sessions)
+    if actor.role not in {UserRole.MODERATOR, UserRole.ADMIN}:
+        raise HTTPException(403, 'Нужны права модератора')
+    post = await db.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise HTTPException(404, 'Пост не найден')
+    filenames = list(await db.scalars(select(PostPhoto.filename).where(PostPhoto.post_id == post.id)))
+    await db.delete(post)
+    await db.commit()
+    for filename in filenames:
+        remove_photo(request.app.state.upload_dir, filename)
+    return Response(status_code=204)

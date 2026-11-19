@@ -603,3 +603,128 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             results = await asyncio.gather(first.patch('/users/me/username', json={'username':name}),
                                            second.patch('/users/me/username', json={'username':name.upper()}))
         self.assertEqual(sorted(r.status_code for r in results), [200, 409])
+
+    async def test_update_and_delete_own_post(self):
+        from io import BytesIO
+        from PIL import Image
+        self.assertEqual((await self.client.put('/posts/1', json={'title':'a','text':'b','category':'route'})).status_code, 401)
+        await self.account()
+        post = (await self.client.post('/posts', json={'title':'Original','text':'Body','category':'route'})).json()
+        post_id = post['id']
+        image = BytesIO(); Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        uploaded = (await self.client.post(f'/posts/{post_id}/photos', files=[('files', ('x.png', image.getvalue(), 'image/png'))])).json()
+        photo_url = uploaded['photo_url']
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':' ','text':'Body','category':'route'})).status_code, 422)
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':'Changed','text':'Updated','category':'tricks','author_id':999})).status_code, 422)
+        await self.account()
+        self.assertEqual((await self.client.put(f'/posts/{post_id}', json={'title':'Changed','text':'Updated','category':'tricks'})).status_code, 403)
+        self.assertEqual((await self.client.delete(f'/posts/{post_id}')).status_code, 403)
+        self.assertEqual((await self.client.get(f'/posts/{post_id}')).json()['title'], 'Original')
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.delete(f'/posts/{post_id}')).status_code, 401)
+        await self.account()
+        own = (await self.client.post('/posts', json={'title':'Own','text':'Body','category':'route'})).json()
+        response = await self.client.put(f"/posts/{own['id']}", json={'title':'Changed','text':'Updated','category':'tricks'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['title'], 'Changed')
+        self.assertEqual(response.json()['category'], 'tricks')
+        self.assertEqual((await self.client.get(f"/posts/{own['id']}")).json()['text'], 'Updated')
+        self.assertEqual((await self.client.delete(f"/posts/{own['id']}")).status_code, 204)
+        self.assertEqual((await self.client.get(f"/posts/{own['id']}")).status_code, 404)
+        self.assertEqual((await self.client.delete(f"/posts/{own['id']}")).status_code, 404)
+        self.assertEqual((await self.client.delete('/posts/2147483647')).status_code, 404)
+        # The first author's post and its photo remain untouched by a different account.
+        self.assertEqual((await self.client.get(photo_url)).status_code, 200)
+
+    async def test_post_place_create_edit_remove_and_feed(self):
+        from io import BytesIO
+        from PIL import Image
+        await self.account()
+        base = {'title': 'Маршрут у озера', 'text': 'Место старта', 'category': 'route'}
+        place = {'latitude': 55.7558, 'longitude': 37.6173, 'name': 'Старт маршрута'}
+        for invalid in [{'latitude': 91, 'longitude': 0}, {'latitude': 0},
+                        {'latitude': 0, 'longitude': 181}, {'latitude': 'NaN', 'longitude': 0},
+                        {'latitude': 0, 'longitude': 0, 'name': ' '},
+                        {'latitude': 0, 'longitude': 0, 'name': 'x' * 201}]:
+            self.assertEqual((await self.client.post('/posts', json={**base, 'place': invalid})).status_code, 422)
+        created = await self.client.post('/posts', json={**base, 'place': place})
+        self.assertEqual(created.status_code, 201, created.text)
+        post = created.json()
+        self.assertEqual(post['place'], place)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).json()['place'], place)
+        feed = (await self.client.get('/posts', params={'q': base['title']})).json()['items']
+        self.assertEqual(next(p for p in feed if p['id'] == post['id'])['place'], place)
+        user_id = post['author']['id']
+        user_posts = (await self.client.get(f'/users/{user_id}/posts')).json()['items']
+        self.assertEqual(next(p for p in user_posts if p['id'] == post['id'])['place'], place)
+        unchanged = await self.client.put(f"/posts/{post['id']}", json=base)
+        self.assertEqual(unchanged.json()['place'], place)
+        image = BytesIO(); Image.new('RGB', (8, 8), 'red').save(image, 'PNG')
+        files = [('files', ('photo.png', image.getvalue(), 'image/png'))]
+        multipart = await self.client.post('/posts/with-photos', data={**base,
+            'place_latitude': '0', 'place_longitude': '0', 'place_name': 'Экватор'}, files=files)
+        self.assertEqual(multipart.status_code, 201, multipart.text)
+        self.assertEqual(multipart.json()['place'], {'latitude': 0.0, 'longitude': 0.0, 'name': 'Экватор'})
+        self.assertEqual((await self.client.post('/posts/with-photos', data={**base, 'place_latitude': '10'}, files=files)).status_code, 422)
+        await self.account()
+        self.assertEqual((await self.client.put(f"/posts/{post['id']}", json={**base, 'place': None})).status_code, 403)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).json()['place'], place)
+        self.client.cookies.clear()
+        self.assertEqual((await self.client.put(f"/posts/{post['id']}", json={**base, 'place': None})).status_code, 401)
+        # A fresh author session can remove the place.
+        await self.account()
+        own = (await self.client.post('/posts', json={**base, 'place': place})).json()
+        removed = await self.client.put(f"/posts/{own['id']}", json={**base, 'place': None})
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertIsNone(removed.json()['place'])
+        self.assertIsNone((await self.client.get(f"/posts/{own['id']}")).json()['place'])
+
+    async def test_roles_and_moderation_permissions(self):
+        from auth.models import UserModel, UserRole
+        from shared import new_session_maker
+        from config import Config
+        from sqlalchemy import select
+        user = await self.account()
+        user_id = (await self.client.get('/auth/me')).json()['id']
+        post = (await self.client.post('/posts', json={'title':'Пост','text':'Текст','category':'route'})).json()
+        comment = (await self.client.post(f"/posts/{post['id']}/comments", json={'text':'Тест'})).json()
+        user_cookie = self.client.cookies.get('session_id')
+        moderator = await self.account()
+        moderator_id = (await self.client.get('/auth/me')).json()['id']
+        moderator_cookie = self.client.cookies.get('session_id')
+        admin = await self.account()
+        admin_id = (await self.client.get('/auth/me')).json()['id']
+        admin_cookie = self.client.cookies.get('session_id')
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'user')
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'moderator'})).status_code, 403)
+        # Bootstrap is an operator action; tests grant the first admin directly in the disposable DB.
+        maker = new_session_maker(Config().postgres)
+        try:
+            async with maker() as db:
+                record = await db.scalar(select(UserModel).where(UserModel.id == admin_id))
+                record.role = UserRole.ADMIN
+                await db.commit()
+        finally:
+            await maker.kw["bind"].dispose()
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'admin')
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'admin'})).status_code, 422)
+        self.assertEqual((await self.client.put(f'/admin/users/{admin_id}/role', json={'role':'user'})).status_code, 403)
+        changed = await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'moderator'})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(changed.json()['role'], 'moderator')
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'moderator')
+        self.assertEqual((await self.client.put(f'/admin/users/{user_id}/role', json={'role':'moderator'})).status_code, 403)
+        self.client.cookies.set('session_id', user_cookie)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 403)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/moderation")).status_code, 403)
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 204)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/comments/{comment['id']}/moderation")).status_code, 404)
+        self.assertEqual((await self.client.delete(f"/posts/{post['id']}/moderation")).status_code, 204)
+        self.assertEqual((await self.client.get(f"/posts/{post['id']}")).status_code, 404)
+        self.client.cookies.set('session_id', admin_cookie)
+        self.assertEqual((await self.client.put(f'/admin/users/{moderator_id}/role', json={'role':'user'})).status_code, 200)
+        self.client.cookies.set('session_id', moderator_cookie)
+        self.assertEqual((await self.client.get('/auth/me')).json()['role'], 'user')
+        self.assertEqual((await self.client.delete('/posts/2147483647/moderation')).status_code, 403)

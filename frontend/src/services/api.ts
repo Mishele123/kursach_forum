@@ -15,7 +15,19 @@ export const authApi = {
 export const postsApi = {
  getPosts: async (limit=10, cursor?: string, filters: {q?: string; category?: string} = {}) => (await api.get<FeedResponse>('/posts',{params:{limit,cursor,...filters}})).data,
  setLike: async (id: number, enabled: boolean) => (await api.request<{like_count: number; liked_by_me: boolean}>({url: `/posts/${id}/like`, method: enabled ? 'PUT' : 'DELETE'})).data,
- createWithPhotos: async (data: CreatePostDto, files: File[]) => { const form = new FormData(); Object.entries(data).forEach(([key,value]) => form.append(key,value)); files.forEach(file => form.append('files',file)); return (await api.post<Post>('/posts/with-photos',form)).data; },
+ createWithPhotos: async ({ title, text, category, place }: CreatePostDto, files: File[]) => {
+   const form = new FormData();
+   form.append('title', title);
+   form.append('text', text);
+   form.append('category', category);
+   if (place) {
+     form.append('place_latitude', String(place.latitude));
+     form.append('place_longitude', String(place.longitude));
+     if (place.name) form.append('place_name', place.name);
+   }
+   files.forEach(file => form.append('files', file));
+   return (await api.post<Post>('/posts/with-photos', form)).data;
+ },
  addPhotos: async (id: number, files: File[]) => { const form = new FormData(); files.forEach(file => form.append('files',file)); return (await api.post<Post>(`/posts/${id}/photos`,form)).data; },
  getPost: async (id:number) => (await api.get<Post>(`/posts/${id}`)).data,
  createPost: async (data:CreatePostDto) => (await api.post<Post>('/posts',data)).data,

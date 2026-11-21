@@ -32,15 +32,28 @@ function FeedResults() {
     }).catch(err => { if (active) setError(errorMessage(err)); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [cursor,retry]);
-  const visiblePosts=posts;
+  function updatePost(updated: Post) {
+    if (!q && !category) {
+      setPosts(items => items.map(item => item.id === updated.id ? updated : item));
+      return;
+    }
+
+    // Let the API re-evaluate whether the edited post still matches the filters.
+    setPosts(items => items.filter(item => item.id !== updated.id));
+    setMore(false);
+    setCursor(undefined);
+    setRetry(attempt => attempt + 1);
+  }
   return <section className="velo-page feed-page"><h1>Ближе к людям. Дальше на велосипеде.</h1><p className="subtitle">Истории, опыт и новые открытия вашего сообщества</p>
     <div className="velo-card composer"><h2>Есть чем поделиться?</h2><Link className="composer-prompt" to={user ? '/post/create' : '/login'}>Маршрут, апгрейд или новая история...</Link><div><Link to="/post/create">+ Фото</Link><Link to="/post/create">Категория</Link><Link className="velo-button" to="/post/create">Создать пост</Link></div></div>
     <div className="category-tabs"><button className={!category ? 'selected' : ''} onClick={() => setParams(q ? {q} : {})}>Все записи</button>{POST_CATEGORIES.map(c => <button key={c} className={category === c ? 'selected' : ''} onClick={() => setParams({category:c, ...(q ? {q} : {})})}>{CATEGORY_LABELS[c]}</button>)}</div>
     {q && <p>Поиск: {q} <button onClick={() => setParams(category ? {category} : {})}>Сбросить</button></p>}
     {error && <div className="error" role="alert">{error} <button onClick={() => setRetry(x => x+1)}>Повторить</button></div>}
-    {visiblePosts.map(post => <PostCard key={post.id} post={post} />)}
+    {posts.map(post => <PostCard key={post.id} post={post}
+      onUpdate={updatePost}
+      onDelete={id => setPosts(items => items.filter(item => item.id !== id))} />)}
     {busy && <p role="status">Загрузка публикаций...</p>}
-    {!busy && !error && !visiblePosts.length && <div className="velo-card feed-empty" role="status">
+    {!busy && !error && !posts.length && <div className="velo-card feed-empty" role="status">
       <span className="feed-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span>
       <h2>Ничего не найдено</h2>
       <p>Попробуйте изменить запрос или убрать фильтры.</p>

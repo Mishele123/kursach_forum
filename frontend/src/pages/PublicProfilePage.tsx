@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { peopleApi, errorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -41,12 +41,15 @@ function Profile({ id }: { id: number }) {
         <div className="profile-identity-text"><h2 id="public-user-name">{profile.username}</h2><p className="profile-location">{[profile.city, profile.discipline].filter(Boolean).join(' · ') || 'Велосипедист сообщества'}</p>
           {profile.interests.length > 0 ? <ul className="interest-tags profile-inline-interests" aria-label="Интересы">{profile.interests.map((interest, index) => <li key={`${interest}-${index}`}>{interest}</li>)}</ul> : <p className="public-user-empty-interests">Интересы пока не указаны</p>}
         </div>
-      </div></div></section>
+      </div>
+      </div></section>
       <section className="velo-card profile-garage" aria-labelledby="public-user-bikes"><div className="profile-section-heading"><h2 id="public-user-bikes">Велосипеды<span className="profile-count">{profile.bikes.length}</span></h2></div>
         {profile.bikes.length > 0 ? <div className="profile-bikes-grid">{profile.bikes.map(bike => <article className="velo-card profile-bike-card" key={bike.id}><div className="profile-bike-media"><BikeImage bike={bike} /></div><div className="profile-bike-content"><h3>{bike.brand} {bike.model}</h3><p>{bike.year}</p></div></article>)}</div> : <div className="profile-empty"><p>Велосипеды пока не добавлены.</p></div>}
       </section>
       <section className="profile-publications" aria-labelledby="public-user-posts"><div className="profile-section-heading"><h2 id="public-user-posts">Публикации</h2></div>
-        {posts.map(post => <PostCard key={post.id} post={post} compact />)}
+        {posts.map(post => <PostCard key={post.id} post={post} compact
+          onUpdate={updated => setPosts(items => items.map(item => item.id === updated.id ? updated : item))}
+          onDelete={id => setPosts(items => items.filter(item => item.id !== id))} />)}
         {!posts.length && !busy && !error && <div className="velo-card profile-empty"><p>Публикаций пока нет.</p></div>}
       </section>
     </>}

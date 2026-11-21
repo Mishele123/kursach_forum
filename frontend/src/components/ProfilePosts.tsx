@@ -24,7 +24,9 @@ export default function ProfilePosts({ userId }: { userId: number }) {
   }, [userId, cursor, retry]);
   return <section className="profile-publications" aria-labelledby="my-publications-heading">
     <div className="profile-section-heading"><h2 id="my-publications-heading">Мои публикации</h2><Link to="/post/create">+ Создать пост</Link></div>
-    {posts.map(post => <PostCard key={post.id} post={post} compact />)}
+    {posts.map(post => <PostCard key={post.id} post={post} compact
+          onUpdate={updated => setPosts(items => items.map(item => item.id === updated.id ? updated : item))}
+          onDelete={id => setPosts(items => items.filter(item => item.id !== id))} />)}
     {busy && <p role="status">Загрузка публикаций…</p>}
     {error && <div className="error" role="alert"><p>{error}</p><button type="button" className="velo-button secondary" onClick={() => setRetry(value => value + 1)}>Повторить</button></div>}
     {!posts.length && !busy && !error && <div className="velo-card profile-empty"><h3>Здесь начинается ваша история</h3><p>Вы ещё не опубликовали ни одного поста. Поделитесь первым маршрутом или историей о велосипеде.</p><Link className="velo-button secondary" to="/post/create">Создать первый пост</Link></div>}

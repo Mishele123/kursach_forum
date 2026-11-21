@@ -1,36 +1,132 @@
 .velo-card.post-card {
   position: relative;
   padding: 24px;
-  border: 1px solid #e0e7df;
-  border-radius: 20px;
+  border: 1px solid #dee1e8;
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 4px 24px #203e2c05;
+  box-shadow: 0 4px 24px #1c294205;
 }
+
+.post-card.post-card-owner .post-author { padding-right: 175px; }
+.post-owner-menu { position: relative; }
+.post-owner-menu[open] { z-index: 2; }
+.post-card-menu { position: absolute; top: 25px; right: 24px; }
+.post-owner-menu summary {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  border: 1px solid #dee1e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1c2840;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  list-style: none;
+}
+.post-owner-menu summary::-webkit-details-marker { display: none; }
+.post-owner-menu summary:hover,
+.post-owner-menu[open] summary { background: #eef2f9; }
+.post-owner-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid #dee1e8;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #1c294222;
+}
+.post-owner-options button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  text-align: left;
+  font-weight: 600;
+}
+.post-owner-options button:hover { background: #eef2f9; }
+.post-owner-options .post-danger-text { color: #aa2924; }
+.post-owner-options .post-danger-text:hover { background: #fff1ef; }
+.post-owner-options .post-danger-text { white-space: nowrap; }
+
+.post-action-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(470px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid #dee1e8;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c2840;
+  box-shadow: 0 16px 48px #1c294233;
+}
+.post-action-dialog::backdrop { background: #12192666; }
+.post-action-dialog h3 { margin: 0 32px 18px 0; font-size: 21px; font-weight: 700; }
+.post-action-dialog p { overflow-wrap: anywhere; }
+.post-dialog-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 22px;
+}
+.post-dialog-close:hover { background: #eef2f9; }
+.post-edit-fields { display: grid; gap: 14px; min-width: 0; }
+.post-edit-fields label { display: grid; gap: 5px; font-weight: 600; }
+.post-edit-fields :is(input, select, textarea) {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #c1c8d5;
+  border-radius: 6px;
+  background: #fff;
+  font-weight: 400;
+}
+.post-edit-fields textarea { resize: vertical; }
+.post-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.post-action-dialog .post-danger-button { background: #ad2924; color: #fff; }
+.post-action-dialog .post-danger-button:hover { background: #91201c; }
+.post-action-dialog .error { margin-top: 12px; color: #aa2924; }
 .post-card .post-author { gap: 11px; margin: 0 0 24px; padding-right: 130px; min-height: 44px; }
-.post-card .post-author .avatar { width: 44px; height: 44px; flex-shrink: 0; font-size: 17px; background: #edf2e8; }
-.post-card .post-author strong { font-size: 14px; color: #203c31; }
-.post-card .post-author p { font-size: 12px; margin-top: 2px; color: #849087; }
-.post-card > .category-badge { position: absolute; top: 28px; right: 24px; padding: 6px 10px; border: 1px solid #e3eadb; border-radius: 7px; background: #f5f8ef; font-size: 9px; letter-spacing: 1.1px; }
+.post-card .post-author .avatar { width: 44px; height: 44px; flex-shrink: 0; font-size: 17px; background: #e7ebf3; }
+.post-card .post-author > div { min-width: 0; overflow-wrap: anywhere; }
+.post-card .post-author strong { font-size: 14px; color: #1c2840; }
+.post-card .post-author p { font-size: 12px; margin-top: 2px; color: #7483a0; }
+.post-card > .category-badge { position: absolute; top: 28px; right: 24px; padding: 6px 10px; border: 1px solid #d9e0ec; border-radius: 6px; background: #eef2f9; font-size: 9px; letter-spacing: 1.1px; }
 .velo-card.post-card h2 { font-size: 25px; line-height: 1.3; letter-spacing: -.65px; font-weight: 700; margin: 0 0 10px; overflow-wrap: anywhere; }
-.post-card > a:hover h2 { color: #327653; }
-.velo-card.post-card .post-text { font-size: 14px; line-height: 1.75; margin: 0 0 20px; color: #647269 !important; }
+.post-card > a:hover h2 { color: #2a467e; }
+.velo-card.post-card .post-text { font-size: 14px; line-height: 1.75; margin: 0 0 20px; color: #57647f !important; }
 .post-card .post-gallery { gap: 8px; }
-.post-card .post-gallery > button { overflow: hidden; border-radius: 12px; background: #f0f3ed; }
+.post-card .post-gallery > button { overflow: hidden; border-radius: 4px; background: #eceff4; }
 .post-card .post-gallery > button:only-child { height: auto; }
 .post-card .post-gallery > button:only-child img { width: 100%; height: auto; max-height: 520px; object-fit: contain; }
 .post-card .post-gallery > button:hover img { filter: brightness(.97); }
 .post-card .post-gallery img { transition: filter .2s; }
-.velo-card.post-card footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #edf0e9; }
+.velo-card.post-card footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8ebf1; }
 .post-card .post-actions { gap: 12px; }
-.post-card .post-actions .velo-button { min-height: 38px; padding: 9px 14px; border: 1px solid #e2e9dc; border-radius: 9px; background: #f7f9f3; color: #45634e; font-size: 12px; }
-.post-card .post-actions [aria-pressed=true] { background: #eaf2e3; border-color: #d4e3c8; color: #286444; }
-.post-card .post-actions > a { font-size: 12px; font-weight: 600; color: #577160; padding: 8px 0; }
-.post-card .post-actions > a:hover { color: #1b593b; }
+.post-card .post-actions .velo-button { min-height: 38px; padding: 9px 14px; border: 1px solid #dae0eb; border-radius: 6px; background: #f2f5fa; color: #414e67; font-size: 12px; }
+.post-card .post-actions [aria-pressed=true] { background: #e1e8f4; border-color: #c5d0e6; color: #213a6c; }
+.post-card .post-actions > a { font-size: 12px; font-weight: 600; color: #515e77; padding: 8px 0; }
+.post-card .post-actions > a:hover { color: #152e5f; }
 @media (max-width: 700px) {
-  .velo-card.post-card { padding: 18px; border-radius: 16px; }
+  .velo-card.post-card { padding: 18px; border-radius: 4px; }
   .post-card .post-author { padding-right: 100px; margin-bottom: 20px; }
   .post-card > .category-badge { top: 24px; right: 18px; font-size: 8px; padding: 5px 7px; }
   .velo-card.post-card h2 { font-size: 22px; }
   .velo-card.post-card .post-text { font-size: 13px; }
   .post-card .post-actions { gap: 8px; }
+}
+
+.post-card.post-card-owner > .category-badge { right: 70px; }
+@media (max-width: 700px) {
+  .post-card.post-card-owner .post-author { padding-right: 140px; }
+  .post-card.post-card-owner > .category-badge { right: 62px; }
+  .post-card-menu { top: 20px; right: 18px; }
+  .post-action-dialog { padding: 18px; }
 }

@@ -31,6 +31,8 @@ export const postsApi = {
  addPhotos: async (id: number, files: File[]) => { const form = new FormData(); files.forEach(file => form.append('files',file)); return (await api.post<Post>(`/posts/${id}/photos`,form)).data; },
  getPost: async (id:number) => (await api.get<Post>(`/posts/${id}`)).data,
  createPost: async (data:CreatePostDto) => (await api.post<Post>('/posts',data)).data,
+ updatePost: async (id: number, data: CreatePostDto) => (await api.put<Post>(`/posts/${id}`, data)).data,
+ deletePost: async (id: number) => { await api.delete(`/posts/${id}`); },
 };
 export const bikesApi = {
  getMyBikes: async () => (await api.get<Bike[]>('/users/me/bikes')).data,

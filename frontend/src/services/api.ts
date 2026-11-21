@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PeoplePage, PeopleFilters, PublicProfile } from '../types';
+import type { ModerationRole, PeoplePage, PeopleFilters, PublicProfile } from '../types';
 import type { Comment, CommentsPage, User, CreateUserDto, LoginDto, UpdateUserDto, AuthResponse, Post, CreatePostDto, Bike, CreateBikeDto, FeedResponse } from '../types';
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 const api = axios.create({ baseURL, withCredentials: true });
@@ -15,10 +15,29 @@ export const authApi = {
 export const postsApi = {
  getPosts: async (limit=10, cursor?: string, filters: {q?: string; category?: string} = {}) => (await api.get<FeedResponse>('/posts',{params:{limit,cursor,...filters}})).data,
  setLike: async (id: number, enabled: boolean) => (await api.request<{like_count: number; liked_by_me: boolean}>({url: `/posts/${id}/like`, method: enabled ? 'PUT' : 'DELETE'})).data,
- createWithPhotos: async (data: CreatePostDto, files: File[]) => { const form = new FormData(); Object.entries(data).forEach(([key,value]) => form.append(key,value)); files.forEach(file => form.append('files',file)); return (await api.post<Post>('/posts/with-photos',form)).data; },
+ createWithPhotos: async ({ title, text, category, place }: CreatePostDto, files: File[]) => {
+   const form = new FormData();
+   form.append('title', title);
+   form.append('text', text);
+   form.append('category', category);
+   if (place) {
+     form.append('place_latitude', String(place.latitude));
+     form.append('place_longitude', String(place.longitude));
+     if (place.name) form.append('place_name', place.name);
+   }
+   files.forEach(file => form.append('files', file));
+   return (await api.post<Post>('/posts/with-photos', form)).data;
+ },
  addPhotos: async (id: number, files: File[]) => { const form = new FormData(); files.forEach(file => form.append('files',file)); return (await api.post<Post>(`/posts/${id}/photos`,form)).data; },
  getPost: async (id:number) => (await api.get<Post>(`/posts/${id}`)).data,
  createPost: async (data:CreatePostDto) => (await api.post<Post>('/posts',data)).data,
+ updatePost: async (id: number, data: CreatePostDto) => (await api.put<Post>(`/posts/${id}`, data)).data,
+ deletePost: async (id: number) => { await api.delete(`/posts/${id}`); },
+ moderatePost: async (id: number) => { await api.delete(`/posts/${id}/moderation`); },
+};
+export const adminApi = {
+ setRole: async (id: number, role: ModerationRole) =>
+   (await api.put<{ id: number; username: string; role: ModerationRole }>(`/admin/users/${id}/role`, { role })).data,
 };
 export const bikesApi = {
  getMyBikes: async () => (await api.get<Bike[]>('/users/me/bikes')).data,
@@ -46,4 +65,7 @@ export default api;
 export const commentsApi = {
  getComments: async (postId: number, cursor?: number) => (await api.get<CommentsPage>(`/posts/${postId}/comments`, {params: {limit: 10, cursor}})).data,
  createComment: async (postId: number, text: string) => (await api.post<Comment>(`/posts/${postId}/comments`, {text})).data,
+ moderateComment: async (postId: number, id: number) => {
+   await api.delete(`/posts/${postId}/comments/${id}/moderation`);
+ },
 };

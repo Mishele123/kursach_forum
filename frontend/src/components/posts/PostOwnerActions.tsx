@@ -13,26 +13,28 @@ export interface PostMutationProps {
   onDelete: (id: number) => void;
 }
 
-export default function PostOwnerActions({ post, onUpdate, onDelete }: PostMutationProps & {
+export default function PostOwnerActions({ post, isOwner, onUpdate, onDelete }: PostMutationProps & {
   post: Post;
+  isOwner: boolean;
 }) {
   const [action, setAction] = useState<Action | null>(null);
 
   return <>
     <ContentActions className="post-card-menu" label="Действия с публикацией">{choose => <>
-      <button type="button" onClick={() => choose(() => setAction('edit'))}>Редактировать</button>
+      {isOwner && <button type="button" onClick={() => choose(() => setAction('edit'))}>Редактировать</button>}
       <button type="button" className="post-danger-text" onClick={() => choose(() => setAction('delete'))}>
-        Удалить
+        {isOwner ? 'Удалить' : 'Удалить как модератор'}
       </button>
     </>}</ContentActions>
-    {action && <PostActionDialog action={action} post={post} onUpdate={onUpdate}
+    {action && <PostActionDialog action={action} post={post} isOwner={isOwner} onUpdate={onUpdate}
       onDelete={onDelete} onClose={() => setAction(null)} />}
   </>;
 }
 
-function PostActionDialog({ action, post, onUpdate, onDelete, onClose }: PostMutationProps & {
+function PostActionDialog({ action, post, isOwner, onUpdate, onDelete, onClose }: PostMutationProps & {
   action: Action;
   post: Post;
+  isOwner: boolean;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -73,7 +75,7 @@ function PostActionDialog({ action, post, onUpdate, onDelete, onClose }: PostMut
         dialog.current?.close();
         onUpdate(updated);
       } else {
-        await postsApi.deletePost(post.id);
+        await (isOwner ? postsApi.deletePost(post.id) : postsApi.moderatePost(post.id));
         dialog.current?.close();
         onDelete(post.id);
       }

@@ -51,6 +51,8 @@
 .post-owner-options .post-danger-text { color: #aa2924; }
 .post-owner-options .post-danger-text:hover { background: #fff1ef; }
 .post-owner-options .post-danger-text { white-space: nowrap; }
+.comments-panel .comment-moderation-menu { margin-left: auto; align-self: center; }
+.comment-moderation-menu summary { width: 32px; height: 28px; font-size: 19px; }
 
 .post-action-dialog {
   position: fixed;
@@ -93,6 +95,25 @@
 .post-action-dialog .post-danger-button { background: #ad2924; color: #fff; }
 .post-action-dialog .post-danger-button:hover { background: #91201c; }
 .post-action-dialog .error { margin-top: 12px; color: #aa2924; }
+.moderation-dialog fieldset { min-width: 0; }
+.moderation-dialog .velo-button:disabled { opacity: .55; cursor: not-allowed; }
+.moderation-quote {
+  max-height: 160px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #eef1f6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.role-management { margin-top: 16px; }
+.role-management > p { margin-top: 8px; }
+.role-target { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.role-target .avatar { width: 40px; height: 40px; }
+.role-target strong { overflow-wrap: anywhere; }
+.role-options { display: grid; gap: 8px; }
+.role-options label { display: flex; align-items: center; gap: 10px; min-height: 32px; cursor: pointer; }
+.role-options input { width: 18px; height: 18px; accent-color: #19356b; }
 .post-card .post-author { gap: 11px; margin: 0 0 24px; padding-right: 130px; min-height: 44px; }
 .post-card .post-author .avatar { width: 44px; height: 44px; flex-shrink: 0; font-size: 17px; background: #e7ebf3; }
 .post-card .post-author > div { min-width: 0; overflow-wrap: anywhere; }

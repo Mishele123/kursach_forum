@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { peopleApi, errorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AvatarImage from '../components/common/AvatarImage';
 import BikeImage from '../components/common/BikeImage';
 import PostCard from '../components/posts/PostCard';
+import ManageUserRole from '../components/ManageUserRole';
 import type { PublicProfile, Post } from '../types';
 export default function PublicProfilePage() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function PublicProfilePage() {
   return <Profile key={id + String(user?.id)} id={Number(id)} />;
 }
 function Profile({ id }: { id: number }) {
+  const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string>();
@@ -42,6 +44,7 @@ function Profile({ id }: { id: number }) {
           {profile.interests.length > 0 ? <ul className="interest-tags profile-inline-interests" aria-label="Интересы">{profile.interests.map((interest, index) => <li key={`${interest}-${index}`}>{interest}</li>)}</ul> : <p className="public-user-empty-interests">Интересы пока не указаны</p>}
         </div>
       </div>
+      {!authLoading && user?.role === 'admin' && user.id !== profile.id && <ManageUserRole profile={profile} />}
       </div></section>
       <section className="velo-card profile-garage" aria-labelledby="public-user-bikes"><div className="profile-section-heading"><h2 id="public-user-bikes">Велосипеды<span className="profile-count">{profile.bikes.length}</span></h2></div>
         {profile.bikes.length > 0 ? <div className="profile-bikes-grid">{profile.bikes.map(bike => <article className="velo-card profile-bike-card" key={bike.id}><div className="profile-bike-media"><BikeImage bike={bike} /></div><div className="profile-bike-content"><h3>{bike.brand} {bike.model}</h3><p>{bike.year}</p></div></article>)}</div> : <div className="profile-empty"><p>Велосипеды пока не добавлены.</p></div>}

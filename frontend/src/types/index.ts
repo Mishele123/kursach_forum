@@ -1,5 +1,7 @@
 export interface PublicUser { id: number; username: string; avatar_url: string | null; city: string | null; discipline: string | null; interests: string[]; }
-export interface User extends PublicUser { email: string | null; bio: string | null; created_at: string; }
+export type ModerationRole = 'user' | 'moderator';
+export type UserRole = ModerationRole | 'admin';
+export interface User extends PublicUser { email: string | null; bio: string | null; created_at: string; role?: UserRole; }
 export interface PublicProfile extends PublicUser { bikes: Bike[]; }
 export interface PeoplePage { items: PublicUser[]; next_cursor: number | null; }
 export interface PeopleFilters { city?: string; discipline?: string; brand?: string; model?: string; }

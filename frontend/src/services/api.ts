@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PeoplePage, PeopleFilters, PublicProfile } from '../types';
+import type { ModerationRole, PeoplePage, PeopleFilters, PublicProfile } from '../types';
 import type { Comment, CommentsPage, User, CreateUserDto, LoginDto, UpdateUserDto, AuthResponse, Post, CreatePostDto, Bike, CreateBikeDto, FeedResponse } from '../types';
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 const api = axios.create({ baseURL, withCredentials: true });
@@ -33,6 +33,11 @@ export const postsApi = {
  createPost: async (data:CreatePostDto) => (await api.post<Post>('/posts',data)).data,
  updatePost: async (id: number, data: CreatePostDto) => (await api.put<Post>(`/posts/${id}`, data)).data,
  deletePost: async (id: number) => { await api.delete(`/posts/${id}`); },
+ moderatePost: async (id: number) => { await api.delete(`/posts/${id}/moderation`); },
+};
+export const adminApi = {
+ setRole: async (id: number, role: ModerationRole) =>
+   (await api.put<{ id: number; username: string; role: ModerationRole }>(`/admin/users/${id}/role`, { role })).data,
 };
 export const bikesApi = {
  getMyBikes: async () => (await api.get<Bike[]>('/users/me/bikes')).data,
@@ -60,4 +65,7 @@ export default api;
 export const commentsApi = {
  getComments: async (postId: number, cursor?: number) => (await api.get<CommentsPage>(`/posts/${postId}/comments`, {params: {limit: 10, cursor}})).data,
  createComment: async (postId: number, text: string) => (await api.post<Comment>(`/posts/${postId}/comments`, {text})).data,
+ moderateComment: async (postId: number, id: number) => {
+   await api.delete(`/posts/${postId}/comments/${id}/moderation`);
+ },
 };

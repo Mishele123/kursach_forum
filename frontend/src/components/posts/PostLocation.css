@@ -1,0 +1,102 @@
+.post-location-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.post-location-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 9px 16px;
+  border: 1px solid #7b8cae;
+  border-radius: 6px;
+  background: #fff;
+  color: #19356b;
+  font-size: 13px;
+  font-weight: 600;
+}
+.post-location-outline:hover { background: #eff2f8; }
+.post-location-remove { color: #9e302b; font-size: 13px; }
+.post-location-remove:hover { text-decoration: underline; }
+.post-location-outline:disabled,
+.post-location-remove:disabled,
+.post-location-dialog button:disabled { opacity: .55; cursor: not-allowed; }
+.post-location-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #19356b;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.post-location-label svg { flex: none; }
+a.post-location-label:hover { text-decoration: underline; }
+.post-location-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(620px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid #dee1e8;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c2840;
+  box-shadow: 0 16px 48px #1c294233;
+}
+.post-location-dialog::backdrop { background: #12192666; }
+.post-location-dialog h3 { margin: 0 32px 8px 0; font-size: 21px; font-weight: 700; }
+.post-location-dialog p { margin-bottom: 12px; color: #4d5970; }
+.post-location-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 22px;
+}
+.post-location-close:hover { background: #eef2f9; }
+.post-location-map {
+  isolation: isolate;
+  height: 100%;
+  width: 100%;
+  border-radius: 4px;
+  background: #e5e9f1;
+}
+.post-location-dialog .post-location-map { height: clamp(180px, 42dvh, 330px); cursor: crosshair; }
+.post-location-dialog .post-location-coordinates { margin: 6px 0 0; font-size: 12px; }
+.post-location-name { display: grid; gap: 5px; margin-top: 14px; font-weight: 600; }
+.post-location-name input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #c1c8d5;
+  border-radius: 6px;
+  font-weight: 400;
+}
+.post-location-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.post-location-preview { display: grid; gap: 9px; margin-bottom: 14px; }
+.post-location-preview-map { height: 140px; border-radius: 4px; background: #e5e9f1; }
+.post-map-pin::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #19356b;
+  box-shadow: 0 2px 5px #12192666;
+  transform: rotate(-45deg);
+}
+.post-map-pin::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: #fff;
+}
+@media (max-width: 700px) {
+  .post-location-dialog { padding: 18px; }
+}

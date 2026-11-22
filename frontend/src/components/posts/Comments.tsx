@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import { commentsApi, errorMessage } from '../../services/api';
 import { formatRelativeTime } from '../../utils/helpers';
 import AvatarImage from '../common/AvatarImage';
+import ContentActions from '../common/ContentActions';
+import ModerationDialog from '../common/ModerationDialog';
 import type { Comment } from '../../types';
 
 export default function Comments({ postId }: { postId: number }) {
@@ -19,6 +21,8 @@ export default function Comments({ postId }: { postId: number }) {
  const [sending, setSending] = useState(false);
  const [sendError, setSendError] = useState('');
  const [notice, setNotice] = useState('');
+ const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
+ const canModerate = !authLoading && (user?.role === 'moderator' || user?.role === 'admin');
  const alive = useRef(true);
  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
  useEffect(() => {
@@ -61,9 +65,21 @@ export default function Comments({ postId }: { postId: number }) {
   {loadError && <p role="alert" className="error">{loadError} <button type="button" onClick={() => setRetry(n => n + 1)}>Повторить загрузку</button></p>}
   <div className="comments-list">{items.map(comment => <article className="comment-item" key={comment.id}>
    <Link className="avatar comment-avatar" to={`/users/${comment.author.id}`} aria-label={`Профиль ${comment.author.username}`}><AvatarImage username={comment.author.username} url={comment.author.avatar_url}/></Link>
-   <div className="comment-content"><header><Link className="comment-author" to={`/users/${comment.author.id}`}><strong>{comment.author.username}</strong></Link><time dateTime={comment.created_at} title={new Date(comment.created_at).toLocaleString('ru-RU')}>{formatRelativeTime(comment.created_at)}</time></header>
+   <div className="comment-content"><header><Link className="comment-author" to={`/users/${comment.author.id}`}><strong>{comment.author.username}</strong></Link><time dateTime={comment.created_at} title={new Date(comment.created_at).toLocaleString('ru-RU')}>{formatRelativeTime(comment.created_at)}</time>
+    {canModerate && <ContentActions className="comment-moderation-menu" label="Действия с комментарием">{choose =>
+      <button type="button" className="post-danger-text" onClick={() => choose(() => setSelectedComment(comment))}>
+        Удалить как модератор
+      </button>
+    }</ContentActions>}
+   </header>
    <p>{comment.text}</p></div>
   </article>)}</div>
+  {canModerate && selectedComment && <ModerationDialog title="Удалить комментарий?" confirm="Удалить" destructive
+    onSubmit={() => commentsApi.moderateComment(postId, selectedComment.id)}
+    onSuccess={() => setItems(old => old.filter(item => item.id !== selectedComment.id))}
+    onClose={() => setSelectedComment(null)}>
+    <blockquote className="moderation-quote">«{selectedComment.text}»</blockquote>
+  </ModerationDialog>}
   {loading && <p role="status">Загрузка комментариев…</p>}
   {!loading && !loadError && !items.length && <p className="subtitle">Комментариев пока нет. Начните обсуждение!</p>}
   {next !== null && !loadError && <button type="button" className="velo-button secondary" disabled={loading} onClick={() => {if(next !== null) setCursor(next);}}>Загрузить ещё комментарии</button>}
